@@ -3,7 +3,7 @@ services:
   - type: web
     name: pm-api
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/api build"
     startCommand: "node packages/api/dist/index.js"
@@ -27,7 +27,6 @@ services:
   - type: web
     name: pm-web
     runtime: static
-    plan: starter
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/web build"
     staticPublishPath: ./packages/web/dist
     buildFilter:
