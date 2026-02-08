@@ -2,6 +2,7 @@ import { createRootRoute } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { AppShell } from "../components/layout/AppShell";
+import { AuthGate } from "../components/AuthGate";
 import { SseProvider } from "../components/SseProvider";
 import { QuickCapture } from "../components/QuickCapture";
 import { Sonner } from "../components/ui/Sonner";
@@ -58,10 +59,12 @@ export function RouteError(props: { error: unknown }) {
 function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SseProvider />
-      <AppShell />
-      <QuickCapture />
-      <Sonner />
+      <AuthGate>
+        <SseProvider />
+        <AppShell />
+        <QuickCapture />
+        <Sonner />
+      </AuthGate>
     </QueryClientProvider>
   );
 }
