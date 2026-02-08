@@ -5,6 +5,6 @@ export const qk = {
   entity: (entityId: string) => ["entities", entityId] as const,
   entityEvents: (entityId: string) => ["entities", entityId, "events"] as const,
   reviewQueue: (filters: Record<string, unknown>) => ["reviewQueue", filters] as const,
+  reviewQueueCount: (filters: Record<string, unknown>) => ["reviewQueue", "count", filters] as const,
   tags: (q?: string) => ["tags", q ?? ""] as const,
 };
-

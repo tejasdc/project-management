@@ -30,12 +30,11 @@ export function Sidebar() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
 
   const pendingCount = useQuery({
-    queryKey: qk.reviewQueue({ status: "pending", limit: 1 }),
+    queryKey: qk.reviewQueueCount({ status: "pending" }),
     queryFn: async () => {
-      const res = await api.api["review-queue"].$get({ query: { status: "pending", limit: "1" } });
-      const json = await unwrapJson<{ items: any[] }>(res);
-      // We don't have a count endpoint yet; cheap approximation.
-      return json.items.length;
+      const res = await api.api["review-queue"].count.$get({ query: { status: "pending" } });
+      const json = await unwrapJson<{ count: number }>(res);
+      return json.count;
     },
     staleTime: 10_000,
   });
@@ -77,4 +76,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

@@ -6,6 +6,8 @@ import { serviceUnavailable } from "../lib/errors.js";
 export type NotesExtractJob = { rawNoteId: string };
 export type EntitiesOrganizeJob = { rawNoteId: string; entityIds: string[] };
 export type NotesReprocessJob = { rawNoteId: string; requestedByUserId?: string };
+export type EntitiesComputeEmbeddingsJob = { entityId: string };
+export type ReviewQueueExportTrainingDataJob = { since?: string };
 
 let redis: IORedis | null = null;
 
@@ -37,6 +39,14 @@ export const entitiesOrganizeQueue = new Queue<EntitiesOrganizeJob>("entities:or
 });
 
 export const notesReprocessQueue = new Queue<NotesReprocessJob>("notes:reprocess", {
+  connection: getRedisConnection(),
+});
+
+export const entitiesComputeEmbeddingsQueue = new Queue<EntitiesComputeEmbeddingsJob>("entities:compute-embeddings", {
+  connection: getRedisConnection(),
+});
+
+export const reviewQueueExportTrainingDataQueue = new Queue<ReviewQueueExportTrainingDataJob>("review-queue:export-training-data", {
   connection: getRedisConnection(),
 });
 

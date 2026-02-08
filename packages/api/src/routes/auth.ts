@@ -7,7 +7,7 @@ import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
 import { apiKeys } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
-import { generateApiKeyPlaintext, hashApiKey } from "../services/auth.js";
+import { generateApiKey } from "../services/auth.js";
 
 const createApiKeySchema = z.object({
   name: z.string().min(1),
@@ -30,14 +30,7 @@ export const authRoutes = new Hono<AppEnv>()
       const { name } = c.req.valid("json");
       const user = c.get("user");
 
-      const pepper = process.env.API_KEY_HASH_PEPPER;
-      if (!pepper) {
-        // Should never happen in production; keeps behavior deterministic in dev.
-        throw new Error("API_KEY_HASH_PEPPER is required");
-      }
-
-      const plaintextKey = generateApiKeyPlaintext();
-      const keyHash = await hashApiKey(plaintextKey, pepper);
+      const { plaintextKey, keyHash } = await generateApiKey();
 
       const [row] = await db
         .insert(apiKeys)

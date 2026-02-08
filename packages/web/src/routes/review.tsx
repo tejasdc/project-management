@@ -45,7 +45,7 @@ export function ReviewPage() {
       const ids = Array.from(new Set((queue.data?.items ?? []).map((i) => i.entityId).filter(Boolean)));
       const pairs = await Promise.all(
         ids.map(async (id) => {
-          const res = await api.api.entities[id].$get();
+          const res = await api.api.entities[":id"].$get({ param: { id } as any });
           const json = await unwrapJson<{ entity: any }>(res);
           return [id, json.entity] as const;
         })
@@ -57,7 +57,8 @@ export function ReviewPage() {
 
   const resolve = useMutation({
     mutationFn: async (args: { id: string; status: "accepted" | "rejected" | "modified"; userResolution?: any; trainingComment?: string }) => {
-      const res = await api.api["review-queue"][args.id].resolve.$post({
+      const res = await api.api["review-queue"][":id"].resolve.$post({
+        param: { id: args.id } as any,
         json: { status: args.status, userResolution: args.userResolution, trainingComment: args.trainingComment },
       });
       return unwrapJson<any>(res);
@@ -155,4 +156,3 @@ export function ReviewPage() {
     </div>
   );
 }
-

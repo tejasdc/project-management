@@ -15,7 +15,7 @@ function base64UrlDecode(input: string) {
 
 export function parseLimit(raw: string | undefined, opts?: { defaultLimit?: number; maxLimit?: number }) {
   const defaultLimit = opts?.defaultLimit ?? 50;
-  const maxLimit = opts?.maxLimit ?? 200;
+  const maxLimit = opts?.maxLimit ?? 100;
 
   if (!raw) return defaultLimit;
   const n = Number(raw);
@@ -43,4 +43,3 @@ export function decodeCursor<T>(cursor: string): T {
     throw badRequest("Invalid cursor");
   }
 }
-

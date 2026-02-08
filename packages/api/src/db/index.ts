@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import * as schema from "./schema/index.js";
 
@@ -8,13 +8,11 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
 }
 
-// Keep it simple: a single Postgres.js client shared across requests.
-// Postgres.js manages pooling internally.
-export const sql = postgres(databaseUrl, {
+export const pool = new Pool({
+  connectionString: databaseUrl,
   max: Number(process.env.DATABASE_POOL_SIZE ?? 10),
-  connect_timeout: 5,
+  connectionTimeoutMillis: 5_000,
 });
 
-export const db = drizzle(sql, { schema });
+export const db = drizzle(pool, { schema });
 export type Db = typeof db;
-

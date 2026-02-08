@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 
+import type { ReviewSuggestion } from "@pm/shared";
 import { ENTITY_STATUSES } from "@pm/shared";
 import { db } from "../db/index.js";
 import { entities, entityEvents, entityRelationships, epics, reviewQueue } from "../db/schema/index.js";
@@ -7,21 +8,6 @@ import { entityWithAttributesSchema } from "../db/validation.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 
 type ReviewStatus = "accepted" | "rejected" | "modified";
-
-type ReviewSuggestion = {
-  suggestedType?: "task" | "decision" | "insight";
-  suggestedProjectId?: string;
-  suggestedEpicId?: string;
-  duplicateEntityId?: string;
-  similarityScore?: number;
-  proposedEpicName?: string;
-  proposedEpicDescription?: string | null;
-  proposedEpicProjectId?: string;
-  suggestedAssigneeId?: string;
-  suggestedAssigneeName?: string;
-  explanation?: string;
-  [key: string]: unknown;
-};
 
 export type ResolveEffects = {
   updatedEntityIds: string[];
@@ -145,15 +131,15 @@ async function resolveReviewItemTx(
           meta: { oldType: ent.type, oldStatus: ent.status, newType, newStatus },
         });
 
-        // Auto-reject any other pending type_classification items for this entity (defensive; should be unique).
+        // Auto-reject any other pending review items for this entity.
+        // If the entity's type changed, project/epic/assignee/etc suggestions may no longer make sense.
         const others = await tx
           .select({ id: reviewQueue.id })
           .from(reviewQueue)
           .where(
             and(
               eq(reviewQueue.entityId, existing.entityId),
-              eq(reviewQueue.status, "pending"),
-              eq(reviewQueue.reviewType, "type_classification")
+              eq(reviewQueue.status, "pending")
             )
           );
 
@@ -165,7 +151,7 @@ async function resolveReviewItemTx(
               status: "rejected",
               resolvedBy: opts.resolvedByUserId,
               resolvedAt: now,
-              userResolution: { explanation: "Auto-rejected due to type change on another item" } as any,
+              userResolution: { explanation: "Auto-rejected due to entity type change" } as any,
               updatedAt: now,
             })
             .where(and(inArray(reviewQueue.id, otherIds), eq(reviewQueue.status, "pending")));
@@ -177,53 +163,47 @@ async function resolveReviewItemTx(
 
   if (existing.reviewType === "project_assignment") {
     if (!existing.entityId) throw badRequest("project_assignment review item missing entityId");
-    if (opts.status !== "rejected") {
-      const projectId = suggestion?.suggestedProjectId ?? null;
-      await tx.update(entities).set({ projectId, updatedAt: now }).where(eq(entities.id, existing.entityId));
-      effects.updatedEntityIds.push(existing.entityId);
-      await appendEntityReviewEvent(tx, {
-        entityId: existing.entityId,
-        actorUserId: opts.resolvedByUserId,
-        reviewId: existing.id,
-        reviewType: existing.reviewType,
-        body: projectId ? `Project assigned` : `Project cleared`,
-        meta: { projectId },
-      });
-    }
+    const projectId = opts.status === "rejected" ? null : (suggestion?.suggestedProjectId ?? null);
+    await tx.update(entities).set({ projectId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    effects.updatedEntityIds.push(existing.entityId);
+    await appendEntityReviewEvent(tx, {
+      entityId: existing.entityId,
+      actorUserId: opts.resolvedByUserId,
+      reviewId: existing.id,
+      reviewType: existing.reviewType,
+      body: projectId ? `Project assigned` : `Project cleared`,
+      meta: { projectId, resolutionStatus: opts.status },
+    });
   }
 
   if (existing.reviewType === "epic_assignment") {
     if (!existing.entityId) throw badRequest("epic_assignment review item missing entityId");
-    if (opts.status !== "rejected") {
-      const epicId = suggestion?.suggestedEpicId ?? null;
-      await tx.update(entities).set({ epicId, updatedAt: now }).where(eq(entities.id, existing.entityId));
-      effects.updatedEntityIds.push(existing.entityId);
-      await appendEntityReviewEvent(tx, {
-        entityId: existing.entityId,
-        actorUserId: opts.resolvedByUserId,
-        reviewId: existing.id,
-        reviewType: existing.reviewType,
-        body: epicId ? `Epic assigned` : `Epic cleared`,
-        meta: { epicId },
-      });
-    }
+    const epicId = opts.status === "rejected" ? null : (suggestion?.suggestedEpicId ?? null);
+    await tx.update(entities).set({ epicId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    effects.updatedEntityIds.push(existing.entityId);
+    await appendEntityReviewEvent(tx, {
+      entityId: existing.entityId,
+      actorUserId: opts.resolvedByUserId,
+      reviewId: existing.id,
+      reviewType: existing.reviewType,
+      body: epicId ? `Epic assigned` : `Epic cleared`,
+      meta: { epicId, resolutionStatus: opts.status },
+    });
   }
 
   if (existing.reviewType === "assignee_suggestion") {
     if (!existing.entityId) throw badRequest("assignee_suggestion review item missing entityId");
-    if (opts.status !== "rejected") {
-      const assigneeId = suggestion?.suggestedAssigneeId ?? null;
-      await tx.update(entities).set({ assigneeId, updatedAt: now }).where(eq(entities.id, existing.entityId));
-      effects.updatedEntityIds.push(existing.entityId);
-      await appendEntityReviewEvent(tx, {
-        entityId: existing.entityId,
-        actorUserId: opts.resolvedByUserId,
-        reviewId: existing.id,
-        reviewType: existing.reviewType,
-        body: assigneeId ? `Assignee set` : `Assignee cleared`,
-        meta: { assigneeId },
-      });
-    }
+    const assigneeId = opts.status === "rejected" ? null : (suggestion?.suggestedAssigneeId ?? null);
+    await tx.update(entities).set({ assigneeId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    effects.updatedEntityIds.push(existing.entityId);
+    await appendEntityReviewEvent(tx, {
+      entityId: existing.entityId,
+      actorUserId: opts.resolvedByUserId,
+      reviewId: existing.id,
+      reviewType: existing.reviewType,
+      body: assigneeId ? `Assignee set` : `Assignee cleared`,
+      meta: { assigneeId, resolutionStatus: opts.status },
+    });
   }
 
   if (existing.reviewType === "duplicate_detection") {
@@ -274,6 +254,29 @@ async function resolveReviewItemTx(
         .returning({ id: epics.id });
 
       effects.createdEpicId = epic?.id;
+
+      // Create follow-up epic_assignment review items for candidate entities (if provided).
+      const candidateEntityIds = (suggestion as any)?.candidateEntityIds as unknown;
+      if (epic?.id && Array.isArray(candidateEntityIds) && candidateEntityIds.length > 0) {
+        const uniqueIds = Array.from(new Set(candidateEntityIds)).filter((id) => typeof id === "string" && id.length > 0);
+        for (const entityId of uniqueIds) {
+          // Defensive: only create if the entity exists.
+          const ent = await tx.query.entities.findFirst({ where: (t: any, q: any) => eq(t.id, entityId) });
+          if (!ent) continue;
+
+          await tx
+            .insert(reviewQueue)
+            .values({
+              entityId,
+              projectId,
+              reviewType: "epic_assignment",
+              status: "pending",
+              aiSuggestion: { suggestedEpicId: epic.id, explanation: `Assign to newly created epic '${name}'` } as any,
+              aiConfidence: existing.aiConfidence,
+            })
+            .onConflictDoNothing();
+        }
+      }
     }
   }
 

@@ -1,21 +1,42 @@
-import { and, count, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { entities, epics, projects } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
+import { decodeCursor, encodeCursor } from "../lib/pagination.js";
 
-export async function listProjects(opts?: { status?: "active" | "archived"; includeDeleted?: boolean }) {
+type ProjectCursor = { updatedAt: string; id: string };
+
+export async function listProjects(opts?: { status?: "active" | "archived"; includeDeleted?: boolean; limit?: number; cursor?: string | null }) {
   const where: any[] = [];
   if (opts?.status) where.push(eq(projects.status, opts.status));
   if (!opts?.includeDeleted) where.push(isNull(projects.deletedAt));
 
-  const items = await db
+  const cursor = opts?.cursor ? decodeCursor<ProjectCursor>(opts.cursor) : null;
+  if (cursor) {
+    const t = new Date(cursor.updatedAt);
+    where.push(
+      or(
+        lt(projects.updatedAt, t),
+        and(eq(projects.updatedAt, t), lt(projects.id, cursor.id))
+      )
+    );
+  }
+
+  const limit = opts?.limit ?? 50;
+  const rows = await db
     .select()
     .from(projects)
     .where(where.length ? and(...where) : undefined)
-    .orderBy(desc(projects.updatedAt), desc(projects.createdAt));
+    .orderBy(desc(projects.updatedAt), desc(projects.id))
+    .limit(limit + 1);
 
-  return { items };
+  const items = rows.slice(0, limit);
+  const hasMore = rows.length > limit;
+  const last = hasMore ? items[items.length - 1] : null;
+  const nextCursor = last ? encodeCursor({ updatedAt: last.updatedAt.toISOString(), id: last.id } satisfies ProjectCursor) : null;
+
+  return { items, nextCursor };
 }
 
 export async function createProject(input: { name: string; description?: string | null; status?: "active" | "archived" }) {
@@ -148,4 +169,3 @@ export async function getProjectDashboard(opts: { projectId: string; since?: str
     recentEntities,
   };
 }
-

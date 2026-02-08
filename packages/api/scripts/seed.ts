@@ -1,6 +1,6 @@
 import { db } from "../src/db/index.js";
 import { apiKeys, users } from "../src/db/schema/index.js";
-import { generateApiKeyPlaintext, hashApiKey } from "../src/services/auth.js";
+import { generateApiKey } from "../src/services/auth.js";
 
 async function main() {
   const existing = await db.select({ id: users.id }).from(users).limit(1);
@@ -10,13 +10,7 @@ async function main() {
     return;
   }
 
-  const pepper = process.env.API_KEY_HASH_PEPPER;
-  if (!pepper) {
-    throw new Error("API_KEY_HASH_PEPPER is required to seed API keys");
-  }
-
-  const plaintextKey = generateApiKeyPlaintext();
-  const keyHash = await hashApiKey(plaintextKey, pepper);
+  const { plaintextKey, keyHash } = await generateApiKey();
 
   const [user] = await db
     .insert(users)
@@ -41,4 +35,3 @@ main().catch((err) => {
   console.error(err);
   process.exitCode = 1;
 });
-

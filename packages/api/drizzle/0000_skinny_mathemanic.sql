@@ -189,7 +189,7 @@ CREATE INDEX "review_queue_entity_id_idx" ON "review_queue" USING btree ("entity
 CREATE INDEX "review_queue_project_id_idx" ON "review_queue" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "review_queue_review_type_idx" ON "review_queue" USING btree ("review_type");--> statement-breakpoint
 CREATE INDEX "review_queue_resolved_idx" ON "review_queue" USING btree ("status","resolved_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "review_queue_pending_unique_entity_review_type" ON "review_queue" USING btree ("entity_id","review_type") WHERE status = 'pending' AND entity_id IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "review_queue_pending_unique_entity_review_type" ON "review_queue" USING btree ("entity_id","review_type") WHERE status = 'pending' AND entity_id IS NOT NULL AND review_type <> 'low_confidence';--> statement-breakpoint
 CREATE INDEX "entity_events_entity_id_created_at_idx" ON "entity_events" USING btree ("entity_id","created_at");--> statement-breakpoint
 CREATE INDEX "entity_events_actor_user_id_idx" ON "entity_events" USING btree ("actor_user_id");--> statement-breakpoint
 CREATE INDEX "api_keys_user_id_idx" ON "api_keys" USING btree ("user_id");--> statement-breakpoint

@@ -11,6 +11,14 @@ import { logger } from "./lib/logger.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
+import { noteRoutes } from "./routes/notes.js";
+import { projectRoutes } from "./routes/projects.js";
+import { epicRoutes } from "./routes/epics.js";
+import { entityRoutes } from "./routes/entities.js";
+import { reviewQueueRoutes } from "./routes/review-queue.js";
+import { tagRoutes } from "./routes/tags.js";
+import { sseRoutes } from "./routes/sse.js";
+import { tier1IpAuthFailLimiter } from "./middleware/rate-limit.js";
 
 function parseCorsOrigins() {
   const raw = process.env.CORS_ORIGINS ?? "";
@@ -133,11 +141,14 @@ async function checkRedis() {
 }
 
 export function createApp() {
-  const app = new Hono<AppEnv>();
+  const base = new Hono<AppEnv>();
 
-  app.onError((err, c) => toErrorResponse(c, err));
+  base.onError((err, c) => toErrorResponse(c, err));
 
-  app.use(
+  // Pre-auth middleware (rate limiter).
+  base.use("/api/*", tier1IpAuthFailLimiter);
+
+  base.use(
     "/api/*",
     cors({
       origin: parseCorsOrigins(),
@@ -147,7 +158,7 @@ export function createApp() {
   );
 
   // RequestId + lightweight structured logging.
-  app.use("/api/*", async (c, next) => {
+  base.use("/api/*", async (c, next) => {
     const requestId = randomUUID();
     c.set("requestId", requestId);
     c.header("x-request-id", requestId);
@@ -180,7 +191,7 @@ export function createApp() {
   });
 
   // Public routes
-  app.get("/api/health", async (c) => {
+  const withHealth = base.get("/api/health", async (c) => {
     const [dbRes, redisRes] = await Promise.all([checkDb(), checkRedis()]);
     const ok = dbRes.status === "ok" && redisRes.status === "ok";
 
@@ -195,16 +206,23 @@ export function createApp() {
   });
 
   // Auth middleware applied to all other API routes.
-  app.use("/api/*", authMiddleware);
+  withHealth.use("/api/*", authMiddleware);
 
   // Routes
-  app.route("/api/auth", authRoutes);
-  app.route("/api/users", userRoutes);
+  const withRoutes = withHealth
+    .route("/api/auth", authRoutes)
+    .route("/api/users", userRoutes)
+    .route("/api/notes", noteRoutes)
+    .route("/api/projects", projectRoutes)
+    .route("/api/epics", epicRoutes)
+    .route("/api/entities", entityRoutes)
+    .route("/api/review-queue", reviewQueueRoutes)
+    .route("/api", tagRoutes)
+    .route("/api/sse", sseRoutes)
+    // Root (optional)
+    .get("/", (c) => c.json({ status: "ok" }));
 
-  // Root (optional)
-  app.get("/", (c) => c.json({ status: "ok" }));
-
-  app.notFound((c) =>
+  withRoutes.notFound((c) =>
     c.json(
       {
         error: {
@@ -218,6 +236,9 @@ export function createApp() {
     )
   );
 
-  return app;
+  return withRoutes;
 }
 
+// Public app instance (used by Hono RPC client typing).
+export const app = createApp();
+export type AppType = typeof app;

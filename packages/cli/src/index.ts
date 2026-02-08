@@ -5,8 +5,11 @@ import path from "node:path";
 import process from "node:process";
 import { execSync } from "node:child_process";
 import readline from "node:readline/promises";
+import { createHash } from "node:crypto";
 
 import type { NoteSource } from "@pm/shared";
+import chalk from "chalk";
+import Table from "cli-table3";
 
 type Config = {
   apiUrl: string;
@@ -16,14 +19,23 @@ type Config = {
 const CONFIG_DIR = path.join(os.homedir(), ".pm");
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
-function red(s: string) {
-  return `\u001b[31m${s}\u001b[0m`;
+const red = (s: string) => chalk.red(s);
+const green = (s: string) => chalk.green(s);
+const dim = (s: string) => chalk.dim(s);
+const yellow = (s: string) => chalk.yellow(s);
+
+function formatConfidence(value: unknown) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return dim("n/a");
+  if (n >= 0.9) return green(n.toFixed(2));
+  if (n >= 0.7) return yellow(n.toFixed(2));
+  return red(n.toFixed(2));
 }
-function green(s: string) {
-  return `\u001b[32m${s}\u001b[0m`;
-}
-function dim(s: string) {
-  return `\u001b[2m${s}\u001b[0m`;
+
+function shortId(id: unknown) {
+  if (!id) return "";
+  const s = String(id);
+  return s.length > 8 ? s.slice(0, 8) : s;
 }
 
 async function readConfig(): Promise<Config | null> {
@@ -129,7 +141,9 @@ program
       body: { content, source, sourceMeta, capturedAt: new Date().toISOString() },
     });
 
-    console.log(JSON.stringify(res, null, 2));
+    const noteId = res?.note?.id;
+    const deduped = Boolean(res?.deduped);
+    console.log(`${green("Captured")} ${dim(shortId(noteId))} ${deduped ? dim("(deduped)") : ""}`.trim());
   });
 
 program
@@ -137,9 +151,14 @@ program
   .description("List projects")
   .action(async () => {
     const res = await apiFetch({ path: "/api/projects" });
+    const table = new Table({
+      head: [chalk.bold("Name"), chalk.bold("Status"), chalk.bold("Id")],
+      style: { head: [], border: [] },
+    });
     for (const p of res.items ?? []) {
-      console.log(`${p.name}  ${dim(p.id)}`);
+      table.push([p.name, p.status, dim(shortId(p.id))]);
     }
+    console.log(table.toString());
   });
 
 program
@@ -155,10 +174,16 @@ program
     if (opts.status) params.set("status", opts.status);
     if (opts.assignee) params.set("assigneeId", opts.assignee);
     const res = await apiFetch({ path: `/api/entities?${params.toString()}` });
-
+    const table = new Table({
+      head: [chalk.bold("Status"), chalk.bold("Content"), chalk.bold("Id")],
+      colWidths: [14, 70, 12],
+      wordWrap: true,
+      style: { head: [], border: [] },
+    });
     for (const t of res.items ?? []) {
-      console.log(`${t.status.padEnd(12)} ${t.content}  ${dim(t.id)}`);
+      table.push([t.status, t.content, dim(shortId(t.id))]);
     }
+    console.log(table.toString());
   });
 
 program
@@ -172,7 +197,84 @@ program
       method: "POST",
       body: { newStatus },
     });
-    console.log(JSON.stringify(res, null, 2));
+    console.log(`${green("Updated")} ${dim(shortId(res?.entity?.id ?? entityId))} -> ${chalk.bold(res?.entity?.status ?? newStatus)}`);
+  });
+
+program
+  .command("session-sync")
+  .description("Upload Claude Code session files from ~/.claude/projects/ as raw notes")
+  .option("--since <iso>", "Only include sessions modified at/after this ISO timestamp")
+  .option("--dry-run", "Don't upload; just print what would be sent")
+  .action(async (opts) => {
+    const baseDir = path.join(os.homedir(), ".claude", "projects");
+    const since = opts.since ? new Date(String(opts.since)) : null;
+    if (since && Number.isNaN(since.getTime())) throw new Error("Invalid --since timestamp");
+
+    let newCount = 0;
+    let skippedCount = 0;
+    let total = 0;
+
+    const files: string[] = [];
+    async function walk(dir: string) {
+      let entries: any[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          await walk(p);
+          continue;
+        }
+        if (e.isFile()) files.push(p);
+      }
+    }
+
+    await walk(baseDir);
+    files.sort();
+
+    for (const filePath of files) {
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
+      if (since && stat.mtime < since) continue;
+
+      total += 1;
+      const rel = path.relative(baseDir, filePath);
+      const externalId = createHash("sha256").update(`${filePath}:${stat.mtimeMs}`).digest("hex");
+
+      if (opts.dryRun) {
+        console.log(`${dim("DRY")} ${rel}`);
+        continue;
+      }
+
+      const content = await fs.readFile(filePath, "utf8");
+      const res = await apiFetch({
+        path: "/api/notes/capture",
+        method: "POST",
+        body: {
+          content,
+          source: "cli" satisfies NoteSource,
+          externalId,
+          capturedAt: stat.mtime.toISOString(),
+          sourceMeta: {
+            kind: "claude_session",
+            sessionPath: rel,
+            absolutePath: filePath,
+            mtimeMs: stat.mtimeMs,
+            sizeBytes: stat.size,
+          },
+        },
+      });
+
+      if (res?.deduped) skippedCount += 1;
+      else newCount += 1;
+      process.stdout.write(".");
+    }
+
+    if (!opts.dryRun && total > 0) process.stdout.write("\n");
+    console.log(`${green("session-sync")} ${newCount} new, ${skippedCount} skipped (${total} scanned)`);
   });
 
 program
@@ -192,9 +294,9 @@ program
     try {
       for (const item of items) {
         console.log("");
-        console.log(`${item.reviewType}  ${dim(item.id)}`);
-        console.log(`confidence: ${item.aiConfidence}`);
-        console.log(`suggestion: ${JSON.stringify(item.aiSuggestion)}`);
+        console.log(`${chalk.bold(item.reviewType)}  ${dim(item.id)}`);
+        console.log(`confidence: ${formatConfidence(item.aiConfidence)}`);
+        console.log(`suggestion: ${dim(JSON.stringify(item.aiSuggestion))}`);
         if (item.entityId) {
           const ent = await apiFetch({ path: `/api/entities/${item.entityId}` });
           console.log(`entity: ${ent.entity.content}`);
@@ -264,4 +366,3 @@ program.parseAsync(process.argv).catch((err) => {
   console.error(red(err instanceof Error ? err.message : String(err)));
   process.exit(1);
 });
-

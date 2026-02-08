@@ -5,7 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import type { AppEnv } from "../types/env.js";
 import { projectInsertSchema } from "../db/validation.js";
 import { notFound } from "../lib/errors.js";
-import { parseOptionalBoolean } from "../lib/pagination.js";
+import { parseLimit, parseOptionalBoolean } from "../lib/pagination.js";
 import { createProject, getProjectDashboard, listProjects, patchProject } from "../services/projects.js";
 
 const projectIdParamsSchema = z.object({
@@ -15,6 +15,8 @@ const projectIdParamsSchema = z.object({
 const listProjectsQuerySchema = z.object({
   status: z.enum(["active", "archived"]).optional(),
   includeDeleted: z.string().optional(),
+  limit: z.string().optional(),
+  cursor: z.string().optional(),
 });
 
 const projectPatchSchema = projectInsertSchema
@@ -34,7 +36,8 @@ export const projectRoutes = new Hono<AppEnv>()
     async (c) => {
       const q = c.req.valid("query");
       const includeDeleted = parseOptionalBoolean(q.includeDeleted) ?? false;
-      const res = await listProjects({ status: q.status, includeDeleted });
+      const limit = parseLimit(q.limit);
+      const res = await listProjects({ status: q.status, includeDeleted, limit, cursor: q.cursor ?? null });
       return c.json(res);
     }
   )
@@ -79,4 +82,3 @@ export const projectRoutes = new Hono<AppEnv>()
       return c.json(res);
     }
   );
-

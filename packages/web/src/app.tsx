@@ -3,6 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 
 import { router } from "./router";
+import { SseProvider } from "./components/SseProvider";
 
 function shouldRetry(err: unknown) {
   const status =
@@ -26,6 +27,7 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <SseProvider />
       <RouterProvider router={router} />
       <Toaster
         richColors
@@ -41,4 +43,3 @@ export function App() {
     </QueryClientProvider>
   );
 }
-

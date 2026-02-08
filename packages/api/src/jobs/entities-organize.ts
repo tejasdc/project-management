@@ -6,6 +6,7 @@ import { db } from "../db/index.js";
 import { entities, entityTags, epics, projects, rawNotes, reviewQueue, tags, users } from "../db/schema/index.js";
 import { logger } from "../lib/logger.js";
 import { organizeEntities } from "../ai/organization.js";
+import { tryPublishEvent } from "../services/events.js";
 import { DEFAULT_JOB_OPTS, type EntitiesOrganizeJob } from "./queue.js";
 
 function maxBy<T>(items: T[], score: (t: T) => number) {
@@ -138,6 +139,10 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
       sourceMeta: (note.sourceMeta ?? undefined) as any,
     });
 
+    const updatedEntityIds: string[] = [];
+    const updatedProjectIds = new Set<string>();
+    const createdReviewItems: Array<{ id: string; entityId: string | null; projectId: string | null; reviewType: string; status: string }> = [];
+
     await db.transaction(async (tx) => {
       for (const o of org.result.entityOrganizations) {
         const entityId = entityIds[o.entityIndex];
@@ -150,9 +155,12 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
         if (o.projectId && o.projectConfidence >= CONFIDENCE_THRESHOLD) {
           if (existing.projectId !== o.projectId) {
             await tx.update(entities).set({ projectId: o.projectId, updatedAt: new Date() }).where(eq(entities.id, entityId));
+            updatedEntityIds.push(entityId);
+            if (existing.projectId) updatedProjectIds.add(existing.projectId);
+            updatedProjectIds.add(o.projectId);
           }
         } else {
-          await tx
+          const [row] = await tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -162,16 +170,19 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
               aiSuggestion: { suggestedProjectId: o.projectId ?? undefined, explanation: o.projectReason } as any,
               aiConfidence: o.projectConfidence,
             })
-            .onConflictDoNothing();
+            .onConflictDoNothing()
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
         }
 
         // Epic assignment
         if (o.epicId && o.epicConfidence >= CONFIDENCE_THRESHOLD) {
           if (existing.epicId !== o.epicId) {
             await tx.update(entities).set({ epicId: o.epicId, updatedAt: new Date() }).where(eq(entities.id, entityId));
+            updatedEntityIds.push(entityId);
           }
         } else {
-          await tx
+          const [row] = await tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -181,7 +192,9 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
               aiSuggestion: { suggestedEpicId: o.epicId ?? undefined, explanation: o.epicReason } as any,
               aiConfidence: o.epicConfidence,
             })
-            .onConflictDoNothing();
+            .onConflictDoNothing()
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
         }
 
         // Assignee
@@ -189,9 +202,10 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
           if (o.assigneeId && o.assigneeConfidence >= CONFIDENCE_THRESHOLD) {
             if (existing.assigneeId !== o.assigneeId) {
               await tx.update(entities).set({ assigneeId: o.assigneeId, updatedAt: new Date() }).where(eq(entities.id, entityId));
+              updatedEntityIds.push(entityId);
             }
           } else {
-            await tx
+            const [row] = await tx
               .insert(reviewQueue)
               .values({
                 entityId,
@@ -201,7 +215,9 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
                 aiSuggestion: { suggestedAssigneeId: o.assigneeId ?? undefined, explanation: o.assigneeReason ?? undefined } as any,
                 aiConfidence: o.assigneeConfidence ?? 0,
               })
-              .onConflictDoNothing();
+              .onConflictDoNothing()
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            if (row) createdReviewItems.push(row);
           }
         }
 
@@ -209,7 +225,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
         if (o.duplicateCandidates && o.duplicateCandidates.length > 0) {
           const best = maxBy(o.duplicateCandidates, (d) => d.similarityScore);
           if (best) {
-            await tx
+            const [row] = await tx
               .insert(reviewQueue)
               .values({
                 entityId,
@@ -217,20 +233,27 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
                 reviewType: "duplicate_detection",
                 status: "pending",
                 aiSuggestion: {
+                  duplicateCandidates: o.duplicateCandidates,
                   duplicateEntityId: best.entityId,
                   similarityScore: best.similarityScore,
                   explanation: best.reason,
                 } as any,
                 aiConfidence: best.similarityScore,
               })
-              .onConflictDoNothing();
+              .onConflictDoNothing()
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            if (row) createdReviewItems.push(row);
           }
         }
       }
 
       // Epic creation suggestions are project-scoped review items.
       for (const s of org.result.epicSuggestions) {
-        await tx
+        const candidateEntityIds = (s.entityIndices ?? [])
+          .map((idx) => entityIds[idx])
+          .filter(Boolean);
+
+        const [row] = await tx
           .insert(reviewQueue)
           .values({
             projectId: s.projectId,
@@ -240,16 +263,29 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
               proposedEpicName: s.name,
               proposedEpicDescription: s.description,
               proposedEpicProjectId: s.projectId,
+              candidateEntityIds,
               explanation: s.reason,
             } as any,
-            aiConfidence: 0.85,
+            aiConfidence: (s as any).confidence ?? 0.85,
           })
-          .onConflictDoNothing();
+          .onConflictDoNothing()
+          .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+        if (row) createdReviewItems.push(row);
       }
     });
+
+    // Emit SSE events after commit.
+    for (const id of Array.from(new Set(updatedEntityIds))) {
+      await tryPublishEvent("entity:updated", { id, rawNoteId });
+    }
+    for (const item of createdReviewItems) {
+      await tryPublishEvent("review_queue:created", item);
+    }
+    for (const projectId of Array.from(updatedProjectIds)) {
+      await tryPublishEvent("project:stats_updated", { projectId });
+    }
   } catch (err) {
     logger.error({ err, rawNoteId, jobId: job.id }, "entities:organize failed");
     throw err;
   }
 }
-

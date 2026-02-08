@@ -68,6 +68,14 @@ export interface EntityAiMeta {
   model?: string;
   promptVersion?: string;
   extractionRunId?: string;
+  extractedAt?: string;
+  tokenUsage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
+    [key: string]: unknown;
+  };
   fieldConfidence?: Record<string, FieldConfidence>;
   [key: string]: unknown;
 }
@@ -159,6 +167,7 @@ export interface ReviewSuggestion {
   proposedEpicName?: string;
   proposedEpicDescription?: string | null;
   proposedEpicProjectId?: string;
+  candidateEntityIds?: string[];
   duplicateEntityId?: string;
   similarityScore?: number;
   suggestedAssigneeId?: string;

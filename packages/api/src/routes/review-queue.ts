@@ -1,15 +1,15 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 
 import { REVIEW_TYPES, REVIEW_STATUSES, reviewResolveSchema } from "@pm/shared";
 import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
-import { reviewQueue } from "../db/schema/index.js";
+import { entities, reviewQueue } from "../db/schema/index.js";
 import { decodeCursor, encodeCursor, parseLimit } from "../lib/pagination.js";
 import { resolveReviewBatch, resolveReviewItem } from "../services/review.js";
-import { publishEvent } from "../services/events.js";
+import { tryPublishEvent } from "../services/events.js";
 
 const reviewIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -26,6 +26,13 @@ const listReviewQueueQuerySchema = z.object({
 
 type ReviewCursor = { createdAt: string; id: string };
 
+const countReviewQueueQuerySchema = listReviewQueueQuerySchema.pick({
+  status: true,
+  projectId: true,
+  entityId: true,
+  reviewType: true,
+});
+
 const batchResolveSchema = z.object({
   resolutions: z.array(
     z.object({
@@ -38,6 +45,28 @@ const batchResolveSchema = z.object({
 });
 
 export const reviewQueueRoutes = new Hono<AppEnv>()
+  .get(
+    "/count",
+    zValidator("query", countReviewQueueQuerySchema, (result) => {
+      if (!result.success) throw result.error;
+    }),
+    async (c) => {
+      const q = c.req.valid("query");
+
+      const where: any[] = [];
+      if (q.status) where.push(eq(reviewQueue.status, q.status));
+      if (q.projectId) where.push(eq(reviewQueue.projectId, q.projectId));
+      if (q.entityId) where.push(eq(reviewQueue.entityId, q.entityId));
+      if (q.reviewType) where.push(eq(reviewQueue.reviewType, q.reviewType));
+
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(reviewQueue)
+        .where(where.length ? and(...where) : undefined);
+
+      return c.json({ count: row?.count ?? 0 });
+    }
+  )
   .get(
     "/",
     zValidator("query", listReviewQueueQuerySchema, (result) => {
@@ -64,11 +93,36 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         );
       }
 
+      const reviewTypeOrder = sql<number>`
+        case ${reviewQueue.reviewType}
+          when 'type_classification' then 1
+          when 'project_assignment' then 2
+          when 'epic_assignment' then 3
+          when 'assignee_suggestion' then 4
+          when 'duplicate_detection' then 5
+          when 'epic_creation' then 10
+          else 50
+        end
+      `;
+
+      const entityGroupRank = sql<number>`case when ${reviewQueue.entityId} is null then 0 else 1 end`;
+      const projectKey = sql<string>`coalesce(${reviewQueue.projectId}::text, 'ffffffff-ffff-ffff-ffff-ffffffffffff')`;
+      const entityKey = sql<string>`coalesce(${reviewQueue.entityId}::text, '')`;
+
       const rows = await db
         .select()
         .from(reviewQueue)
         .where(where.length ? and(...where) : undefined)
-        .orderBy(desc(reviewQueue.createdAt), desc(reviewQueue.id))
+        // Default batching order (project -> entity -> dependency order).
+        // If a cursor is provided, we preserve the older cursor semantics (createdAt/id) to avoid breaking pagination.
+        .orderBy(
+          cursor ? desc(reviewQueue.createdAt) : projectKey,
+          cursor ? desc(reviewQueue.id) : entityGroupRank,
+          cursor ? desc(reviewQueue.id) : entityKey,
+          cursor ? desc(reviewQueue.id) : reviewTypeOrder,
+          cursor ? desc(reviewQueue.createdAt) : reviewQueue.createdAt,
+          cursor ? desc(reviewQueue.id) : reviewQueue.id
+        )
         .limit(limit + 1);
 
       const items = rows.slice(0, limit);
@@ -102,7 +156,21 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         resolvedByUserId: user.id,
       });
 
-      await publishEvent("review_queue:resolved", { id: res.item.id, status: res.item.status, reviewType: res.item.reviewType, entityId: res.item.entityId, projectId: res.item.projectId });
+      await tryPublishEvent("review_queue:resolved", {
+        id: res.item.id,
+        status: res.item.status,
+        reviewType: res.item.reviewType,
+        entityId: res.item.entityId,
+        projectId: res.item.projectId,
+      });
+
+      for (const entityId of res.effects.updatedEntityIds) {
+        await tryPublishEvent("entity:updated", { id: entityId, via: "review_queue:resolved", reviewId: res.item.id });
+        const ent = await db.query.entities.findFirst({ where: (t, q) => q.eq(t.id, entityId) });
+        if (ent?.projectId) await tryPublishEvent("project:stats_updated", { projectId: ent.projectId });
+      }
+      if (res.item.projectId) await tryPublishEvent("project:stats_updated", { projectId: res.item.projectId });
+
       return c.json(res);
     }
   )
@@ -120,7 +188,18 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         resolvedByUserId: user.id,
       });
 
-      await publishEvent("review_queue:resolved_batch", { count: res.items.length });
+      // Emit per-item resolved events for parity with single resolution.
+      for (const item of res.items) {
+        await tryPublishEvent("review_queue:resolved", {
+          id: item.id,
+          status: item.status,
+          reviewType: item.reviewType,
+          entityId: item.entityId,
+          projectId: item.projectId,
+        });
+        if (item.projectId) await tryPublishEvent("project:stats_updated", { projectId: item.projectId });
+      }
+
       return c.json(res);
     }
   );

@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pm/api": "workspace:*",
+    "@pm/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-router": "^1.158.4",
     "hono": "^4.7.0",

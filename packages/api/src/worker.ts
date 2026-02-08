@@ -20,10 +20,18 @@ function wire(worker: Worker) {
   });
 }
 
+function getConcurrency(defaultValue: number) {
+  const raw = process.env.BULLMQ_CONCURRENCY;
+  if (!raw) return defaultValue;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return defaultValue;
+  return Math.floor(n);
+}
+
 const workers = [
-  new Worker("notes:extract", notesExtractProcessor, { connection, concurrency: 5 }),
-  new Worker("entities:organize", entitiesOrganizeProcessor, { connection, concurrency: 5 }),
-  new Worker("notes:reprocess", notesReprocessProcessor, { connection, concurrency: 2 }),
+  new Worker("notes:extract", notesExtractProcessor, { connection, concurrency: getConcurrency(5) }),
+  new Worker("entities:organize", entitiesOrganizeProcessor, { connection, concurrency: getConcurrency(5) }),
+  new Worker("notes:reprocess", notesReprocessProcessor, { connection, concurrency: getConcurrency(2) }),
 ];
 
 for (const w of workers) wire(w);
@@ -39,4 +47,3 @@ async function shutdown(signal: string) {
 
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
-

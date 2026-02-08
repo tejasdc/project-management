@@ -15,6 +15,7 @@ import {
 } from "../db/schema/index.js";
 import { logger } from "../lib/logger.js";
 import { extractEntities } from "../ai/extraction.js";
+import { tryPublishEvent } from "../services/events.js";
 import { DEFAULT_JOB_OPTS, entitiesOrganizeQueue, type NotesExtractJob } from "./queue.js";
 
 function cleanObject<T extends Record<string, unknown>>(obj: T) {
@@ -54,6 +55,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
     });
 
     const createdEntityIds: string[] = [];
+    const createdReviewItems: Array<{ id: string; entityId: string | null; projectId: string | null; reviewType: string; status: string }> = [];
     const permalink = (note.sourceMeta as any)?.permalink as string | undefined;
 
     await db.transaction(async (tx) => {
@@ -78,6 +80,8 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
           model: extraction.model,
           promptVersion: extraction.promptVersion,
           extractionRunId: String(job.id ?? ""),
+          extractedAt: extraction.extractedAt,
+          tokenUsage: extraction.tokenUsage,
           fieldConfidence: ent.fieldConfidence,
         };
 
@@ -162,37 +166,67 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
         const ent: any = extraction.result.entities[i]!;
         const entityId = createdEntityIds[i]!;
 
-        const typeFc = getFieldConfidence(ent, "type");
-        if (typeFc && typeFc.confidence < CONFIDENCE_THRESHOLD) {
-          await tx
-            .insert(reviewQueue)
-            .values({
-              entityId,
-              reviewType: "type_classification",
-              status: "pending",
-              aiSuggestion: { suggestedType: ent.type, explanation: typeFc.reason } as any,
-              aiConfidence: typeFc.confidence,
-            })
-            .onConflictDoNothing();
-        }
+        const fieldConfidence = (ent?.fieldConfidence ?? {}) as Record<string, { confidence: number; reason?: string }>;
+        for (const [fieldKey, fc] of Object.entries(fieldConfidence)) {
+          if (!fc || typeof fc.confidence !== "number") continue;
+          if (fc.confidence >= CONFIDENCE_THRESHOLD) continue;
 
-        const owner = ent?.attributes?.owner ?? null;
-        const ownerFc = getFieldConfidence(ent, "owner");
-        if (owner && ownerFc && ownerFc.confidence < CONFIDENCE_THRESHOLD) {
-          await tx
+          if (fieldKey === "type") {
+            const [row] = await tx
+              .insert(reviewQueue)
+              .values({
+                entityId,
+                reviewType: "type_classification",
+                status: "pending",
+                aiSuggestion: { suggestedType: ent.type, explanation: fc.reason } as any,
+                aiConfidence: fc.confidence,
+              })
+              .onConflictDoNothing()
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            if (row) createdReviewItems.push(row);
+            continue;
+          }
+
+          if (fieldKey === "owner") {
+            const owner = ent?.attributes?.owner ?? null;
+            if (!owner) continue;
+            const [row] = await tx
+              .insert(reviewQueue)
+              .values({
+                entityId,
+                reviewType: "assignee_suggestion",
+                status: "pending",
+                aiSuggestion: { suggestedAssigneeName: String(owner), explanation: fc.reason } as any,
+                aiConfidence: fc.confidence,
+              })
+              .onConflictDoNothing()
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            if (row) createdReviewItems.push(row);
+            continue;
+          }
+
+          const suggestedValue =
+            fieldKey in ent
+              ? (ent as any)[fieldKey]
+              : ent?.attributes && fieldKey in (ent.attributes as any)
+                ? (ent.attributes as any)[fieldKey]
+                : undefined;
+
+          const [row] = await tx
             .insert(reviewQueue)
             .values({
               entityId,
-              reviewType: "assignee_suggestion",
+              reviewType: "low_confidence",
               status: "pending",
-              aiSuggestion: { suggestedAssigneeName: String(owner), explanation: ownerFc.reason } as any,
-              aiConfidence: ownerFc.confidence,
+              aiSuggestion: { fieldKey, suggestedValue, explanation: fc.reason } as any,
+              aiConfidence: fc.confidence,
             })
-            .onConflictDoNothing();
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
         }
 
         if (typeof ent.confidence === "number" && ent.confidence < CONFIDENCE_THRESHOLD) {
-          await tx
+          const [row] = await tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -201,7 +235,8 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
               aiSuggestion: { explanation: "Low overall extraction confidence" } as any,
               aiConfidence: ent.confidence,
             })
-            .onConflictDoNothing();
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
         }
       }
 
@@ -212,6 +247,15 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
         .where(eq(rawNotes.id, rawNoteId));
     });
 
+    // Emit SSE events after commit.
+    await tryPublishEvent("raw_note:processed", { id: rawNoteId });
+    for (const id of createdEntityIds) {
+      await tryPublishEvent("entity:created", { id, rawNoteId });
+    }
+    for (const item of createdReviewItems) {
+      await tryPublishEvent("review_queue:created", item);
+    }
+
     if (createdEntityIds.length > 0) {
       await entitiesOrganizeQueue.add(
         "entities:organize",
@@ -220,7 +264,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
           ...DEFAULT_JOB_OPTS,
           jobId: rawNoteId,
           attempts: 5,
-          backoff: { type: "exponential", delay: 2000 },
+          backoff: { type: "exponential", delay: 2000 + Math.floor(Math.random() * 500) },
         }
       );
     }
@@ -242,4 +286,3 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
     throw err;
   }
 }
-

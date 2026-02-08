@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { api, unwrapJson } from "../lib/api-client";
 import { qk } from "../lib/query-keys";
@@ -8,10 +8,36 @@ export function ProjectsPage() {
   const projects = useQuery({
     queryKey: qk.projects(),
     queryFn: async () => {
-      const res = await api.api.projects.$get();
+      const res = await api.api.projects.$get({ query: {} as any });
       return unwrapJson<{ items: any[] }>(res);
     },
   });
+
+  const dashboards = useQueries({
+    queries: (projects.data?.items ?? []).map((p: any) => ({
+      queryKey: qk.projectDashboard(p.id),
+      enabled: Boolean(projects.data),
+      queryFn: async () => {
+        const res = await api.api.projects[":id"].dashboard.$get({ param: { id: p.id } as any, query: {} as any });
+        return unwrapJson<any>(res);
+      },
+      staleTime: 30_000,
+    })),
+  });
+
+  const statsByProjectId = new Map<string, any>();
+  for (const q of dashboards) {
+    const d: any = q.data;
+    if (d?.project?.id) {
+      const tasksByStatus = d?.stats?.tasksByStatus ?? {};
+      const totalTasks = Object.values(tasksByStatus).reduce((a: number, b: unknown) => a + Number(b ?? 0), 0);
+      statsByProjectId.set(d.project.id, {
+        tasks: totalTasks,
+        openDecisions: d?.stats?.openDecisions ?? 0,
+        recentInsights: d?.stats?.recentInsights ?? 0,
+      });
+    }
+  }
 
   return (
     <div>
@@ -33,11 +59,10 @@ export function ProjectsPage() {
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {(projects.data?.items ?? []).map((p, i) => (
-            <ProjectCard key={p.id} project={p} index={i} />
+            <ProjectCard key={p.id} project={p} index={i} stats={statsByProjectId.get(p.id)} />
           ))}
         </div>
       )}
     </div>
   );
 }
-

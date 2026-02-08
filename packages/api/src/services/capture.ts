@@ -35,6 +35,7 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
 
   let note: typeof rawNotes.$inferSelect;
   let deduped = false;
+  const jitter = () => Math.floor(Math.random() * 500);
 
   if (input.externalId) {
     try {
@@ -56,7 +57,7 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
     note = row!;
   }
 
-  if (!note.processed) {
+  if (!deduped && !note.processed) {
     try {
       await notesExtractQueue.add(
         "notes:extract",
@@ -65,7 +66,7 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
           ...DEFAULT_JOB_OPTS,
           jobId: note.id,
           attempts: 5,
-          backoff: { type: "exponential", delay: 2000 },
+          backoff: { type: "exponential", delay: 2000 + jitter() },
         }
       );
     } catch (err) {
@@ -83,6 +84,7 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
 
 export async function markNoteForReprocess(opts: { rawNoteId: string; requestedByUserId?: string }) {
   const { rawNoteId, requestedByUserId } = opts;
+  const jitter = () => Math.floor(Math.random() * 500);
 
   const note = await db.query.rawNotes.findFirst({
     where: (t, { eq }) => eq(t.id, rawNoteId),
@@ -97,7 +99,7 @@ export async function markNoteForReprocess(opts: { rawNoteId: string; requestedB
         ...DEFAULT_JOB_OPTS,
         jobId: rawNoteId,
         attempts: 3,
-        backoff: { type: "exponential", delay: 2000 },
+        backoff: { type: "exponential", delay: 2000 + jitter() },
       }
     );
   } catch (err) {

@@ -29,6 +29,7 @@ const epicSuggestionSchema = z.object({
   description: z.string().nullable(),
   projectId: z.string().uuid(),
   entityIndices: z.array(z.number().int().nonnegative()).default([]),
+  confidence: z.number().min(0).max(1).default(0.85),
   reason: z.string(),
 });
 
@@ -38,4 +39,3 @@ export const organizationResultSchema = z.object({
 });
 
 export type OrganizationResult = z.infer<typeof organizationResultSchema>;
-

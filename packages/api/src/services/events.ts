@@ -46,9 +46,19 @@ export async function publishEvent(type: string, data: unknown) {
   await pub!.publish(CHANNEL, JSON.stringify(evt));
 }
 
+// Best-effort publisher for non-critical paths (jobs/routes).
+// SSE is additive; we should not fail the primary request/job if Redis is absent or down.
+export async function tryPublishEvent(type: string, data: unknown) {
+  try {
+    if (!process.env.REDIS_URL) return;
+    await publishEvent(type, data);
+  } catch {
+    // ignore
+  }
+}
+
 export function onEvent(fn: (evt: SseEvent) => void) {
   ensureWired();
   events.on("event", fn);
   return () => events.off("event", fn);
 }
-

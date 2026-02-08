@@ -13,7 +13,7 @@ export type ErrorCode =
   | "INTERNAL_ERROR"
   | "SERVICE_UNAVAILABLE";
 
-export class ApiError extends Error {
+export class AppError extends Error {
   code: ErrorCode;
   status: number;
   details?: unknown;
@@ -26,16 +26,19 @@ export class ApiError extends Error {
   }
 }
 
+// Back-compat alias.
+export const ApiError = AppError;
+
 export function badRequest(message: string, details?: unknown) {
-  return new ApiError({ code: "BAD_REQUEST", status: 400, message, details });
+  return new AppError({ code: "BAD_REQUEST", status: 400, message, details });
 }
 
 export function unauthorized(message = "Unauthorized") {
-  return new ApiError({ code: "UNAUTHORIZED", status: 401, message });
+  return new AppError({ code: "UNAUTHORIZED", status: 401, message });
 }
 
 export function notFound(resource: string, id?: string) {
-  return new ApiError({
+  return new AppError({
     code: "NOT_FOUND",
     status: 404,
     message: `${resource} not found`,
@@ -44,11 +47,23 @@ export function notFound(resource: string, id?: string) {
 }
 
 export function conflict(message: string, details?: unknown) {
-  return new ApiError({ code: "CONFLICT", status: 409, message, details });
+  return new AppError({ code: "CONFLICT", status: 409, message, details });
+}
+
+export function validationError(message = "Validation failed", details?: unknown) {
+  return new AppError({ code: "VALIDATION_ERROR", status: 422, message, details });
+}
+
+export function rateLimited(message = "Rate limited", details?: unknown) {
+  return new AppError({ code: "RATE_LIMITED", status: 429, message, details });
+}
+
+export function internalError(message = "Internal error", details?: unknown) {
+  return new AppError({ code: "INTERNAL_ERROR", status: 500, message, details });
 }
 
 export function serviceUnavailable(message: string, details?: unknown) {
-  return new ApiError({ code: "SERVICE_UNAVAILABLE", status: 503, message, details });
+  return new AppError({ code: "SERVICE_UNAVAILABLE", status: 503, message, details });
 }
 
 export function toErrorResponse(c: Context, err: unknown): Response {
@@ -58,7 +73,7 @@ export function toErrorResponse(c: Context, err: unknown): Response {
     c.req.header("x-request-id") ??
     undefined;
 
-  if (err instanceof ApiError) {
+  if (err instanceof AppError) {
     return c.json(
       {
         error: {
@@ -74,17 +89,18 @@ export function toErrorResponse(c: Context, err: unknown): Response {
   }
 
   if (err instanceof ZodError) {
+    const e = validationError("Validation failed", err.issues);
     return c.json(
       {
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Validation failed",
-          status: 422,
-          details: err.issues,
+          code: e.code,
+          message: e.message,
+          status: e.status,
+          details: e.details,
           requestId,
         },
       },
-      422
+      e.status as any
     );
   }
 

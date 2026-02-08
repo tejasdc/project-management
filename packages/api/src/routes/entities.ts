@@ -5,6 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import type { AppEnv } from "../types/env.js";
 import { entityInsertSchema } from "../db/validation.js";
 import { parseLimit } from "../lib/pagination.js";
+import { tryPublishEvent } from "../services/events.js";
 import {
   addEntityComment,
   createEntity,
@@ -100,6 +101,8 @@ export const entityRoutes = new Hono<AppEnv>()
     async (c) => {
       const data = c.req.valid("json");
       const entity = await createEntity(data as any);
+      await tryPublishEvent("entity:created", { id: entity.id });
+      if (entity.projectId) await tryPublishEvent("project:stats_updated", { projectId: entity.projectId });
       return c.json({ entity }, 201);
     }
   )
@@ -115,6 +118,8 @@ export const entityRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid("param");
       const patch = c.req.valid("json");
       const entity = await patchEntity({ id, patch: patch as any });
+      await tryPublishEvent("entity:updated", { id: entity.id });
+      if (entity.projectId) await tryPublishEvent("project:stats_updated", { projectId: entity.projectId });
       return c.json({ entity });
     }
   )
@@ -152,6 +157,7 @@ export const entityRoutes = new Hono<AppEnv>()
         body: body.body,
         meta: body.meta,
       });
+      await tryPublishEvent("entity:event_added", { entityId: id, eventId: event.id, type: event.type });
       return c.json({ event }, 201);
     }
   )
@@ -168,7 +174,8 @@ export const entityRoutes = new Hono<AppEnv>()
       const { newStatus } = c.req.valid("json");
       const user = c.get("user");
       const entity = await transitionEntityStatus({ entityId: id, actorUserId: user.id, newStatus });
+      await tryPublishEvent("entity:updated", { id: entity.id });
+      if (entity.projectId) await tryPublishEvent("project:stats_updated", { projectId: entity.projectId });
       return c.json({ entity });
     }
   );
-
