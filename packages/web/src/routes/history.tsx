@@ -40,9 +40,6 @@ function statusBadgeVariant(status: string): "success" | "danger" | "warning" | 
 }
 
 function ResolvedReviewsTab() {
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [allItems, setAllItems] = useState<any[]>([]);
-
   const accepted = useQuery({
     queryKey: qk.reviewQueue({ status: "accepted", _page: "history" }),
     queryFn: async () => {
@@ -251,7 +248,7 @@ function EntitiesTab() {
 
 function RawNotesTab() {
   const notes = useQuery({
-    queryKey: ["rawNotes", "history"],
+    queryKey: qk.reviewQueue({ _type: "rawNotes", _page: "history" }),
     queryFn: async () => {
       const res = await api.api.notes.$get({
         query: { limit: "100" },

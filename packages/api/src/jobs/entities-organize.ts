@@ -1,5 +1,5 @@
 import type { Job } from "bullmq";
-import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, notInArray, sql } from "drizzle-orm";
 
 import { CONFIDENCE_THRESHOLD } from "@pm/shared";
 import { db } from "../db/index.js";
@@ -166,7 +166,9 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
             if (existing.projectId) updatedProjectIds.add(existing.projectId);
             updatedProjectIds.add(o.projectId);
           }
-        } else {
+        } else if (o.projectId !== null || o.projectConfidence !== 0) {
+          // Skip review items where the AI has no suggestion and zero confidence — these are
+          // "no match" signals that just clog the review queue.
           const [row] = await tx
             .insert(reviewQueue)
             .values({
@@ -188,7 +190,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
             await tx.update(entities).set({ epicId: o.epicId, updatedAt: new Date() }).where(eq(entities.id, entityId));
             updatedEntityIds.push(entityId);
           }
-        } else {
+        } else if (o.epicId !== null || o.epicConfidence !== 0) {
           const [row] = await tx
             .insert(reviewQueue)
             .values({
@@ -211,7 +213,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
               await tx.update(entities).set({ assigneeId: o.assigneeId, updatedAt: new Date() }).where(eq(entities.id, entityId));
               updatedEntityIds.push(entityId);
             }
-          } else {
+          } else if (o.assigneeId !== null || (o.assigneeConfidence !== 0 && o.assigneeConfidence !== null)) {
             const [row] = await tx
               .insert(reviewQueue)
               .values({
@@ -303,6 +305,29 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
         // Use the first candidate entity to satisfy the entity_or_project CHECK constraint
         const anchorEntityId = candidateEntityIds[0] ?? null;
         if (!anchorEntityId) continue;
+
+        // Deduplicate: skip if a project with this name already exists
+        const existingProject = await tx.query.projects.findFirst({
+          where: (t, { and, isNull }) => and(
+            ilike(t.name, s.name),
+            isNull(t.deletedAt),
+          ),
+        });
+        if (existingProject) continue;
+
+        // Deduplicate: skip if a pending project_creation review item already proposes this name
+        const existingReview = await tx
+          .select({ id: reviewQueue.id })
+          .from(reviewQueue)
+          .where(
+            and(
+              eq(reviewQueue.reviewType, "project_creation"),
+              eq(reviewQueue.status, "pending"),
+              sql`${reviewQueue.aiSuggestion}->>'proposedProjectName' ILIKE ${s.name}`,
+            )
+          )
+          .limit(1);
+        if (existingReview.length > 0) continue;
 
         const [row] = await tx
           .insert(reviewQueue)

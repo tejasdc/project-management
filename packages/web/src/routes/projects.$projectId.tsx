@@ -114,9 +114,9 @@ function relativeTime(dateStr: string): string {
 export function ProjectDashboardPage() {
   const { projectId } = useParams({ from: "/projects/$projectId" });
   const navigate = useNavigate({ from: "/projects/$projectId" });
-  useRouterState({ select: (s) => s.location.href });
+  const locationHref = useRouterState({ select: (s) => s.location.href });
 
-  const sp = new URLSearchParams(window.location.search);
+  const sp = new URLSearchParams(new URL(locationHref, "http://x").search);
   const type = (sp.get("type") || "") as EntityTab;
   const status = sp.get("status") || "";
   const assigneeId = sp.get("assigneeId") || "";
@@ -241,7 +241,7 @@ export function ProjectDashboardPage() {
   const filteredEntities = epicFilter
     ? allEntities.filter((e) => e.epicId === epicFilter)
     : allEntities;
-  const ungrouped = filteredEntities.filter((e) => !e.epicId);
+  const ungrouped = epicFilter ? [] : filteredEntities.filter((e) => !e.epicId);
   const grouped = new Map<string, any[]>();
   for (const e of filteredEntities) {
     if (!e.epicId) continue;
@@ -376,14 +376,6 @@ export function ProjectDashboardPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {(data.epics ?? []).map((e: any, i: number) => {
                   const pct = Math.round((e.progress?.percent ?? 0) * 100);
-                  const totalEntitiesInEpic =
-                    (e.progress?.totalTasks ?? 0) +
-                    Object.values(e.tasksByStatus ?? {}).reduce(
-                      (a: number, b: unknown) => a + Number(b ?? 0),
-                      0,
-                    ) -
-                    (e.progress?.totalTasks ?? 0);
-                  // Entity count: use totalTasks as the count from dashboard (it only counts tasks, not all entity types)
                   const entityCountLabel = e.progress?.totalTasks ?? 0;
 
                   return (
