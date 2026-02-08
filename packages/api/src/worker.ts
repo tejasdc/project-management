@@ -1,12 +1,12 @@
 import { Worker } from "bullmq";
 
 import { createJobLogger, logger } from "./lib/logger.js";
-import { getRedisConnection } from "./jobs/queue.js";
+import { getRedisConnectionOrThrow } from "./jobs/queue.js";
 import { notesExtractProcessor } from "./jobs/notes-extract.js";
 import { entitiesOrganizeProcessor } from "./jobs/entities-organize.js";
 import { notesReprocessProcessor } from "./jobs/notes-reprocess.js";
 
-const connection = getRedisConnection();
+const connection = getRedisConnectionOrThrow();
 
 function wire(worker: Worker) {
   worker.on("completed", (job) => {

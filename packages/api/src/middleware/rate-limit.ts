@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from "hono";
 import type IORedis from "ioredis";
 
 import { getRedisConnection } from "../jobs/queue.js";
+import { logger } from "../lib/logger.js";
 
 function getIp(c: any) {
   const forwarded = c.req.header("x-forwarded-for");
@@ -19,7 +20,6 @@ function toRedisClient(redis: IORedis) {
       return sha;
     },
     evalsha: async <TArgs extends unknown[], TData = unknown>(sha1: string, keys: string[], args: TArgs) => {
-      // ioredis expects: evalsha(sha, numkeys, ...keys, ...args)
       return (await (redis as any).evalsha(sha1, keys.length, ...keys, ...(args as any))) as TData;
     },
     decr: async (key: string) => {
@@ -32,7 +32,6 @@ function toRedisClient(redis: IORedis) {
 }
 
 function makeRateLimitedResponse(c: any, windowMs: number) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const info = c.get("rateLimit" as any) as { resetTime?: Date } | undefined;
   const resetAt = info?.resetTime?.getTime() ?? Date.now() + windowMs;
   const retryAfter = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
@@ -51,18 +50,23 @@ function makeRateLimitedResponse(c: any, windowMs: number) {
   );
 }
 
-const redis = getRedisConnection();
-const redisStoreClient = toRedisClient(redis);
+function buildStore(prefix: string) {
+  const redis = getRedisConnection();
+  if (redis) {
+    return new RedisStore({ client: toRedisClient(redis), prefix });
+  }
+  logger.warn({ prefix }, "Redis unavailable — rate limiting uses in-memory store (not suitable for multi-instance)");
+  return undefined; // hono-rate-limiter defaults to in-memory
+}
 
 export const tier1IpAuthFailLimiter: MiddlewareHandler = rateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: "draft-6",
   requestPropertyName: "rateLimit",
-  store: new RedisStore({ client: redisStoreClient, prefix: "rl:tier1:" }),
+  store: buildStore("rl:tier1:"),
   keyGenerator: async (c) => `ip:${getIp(c)}`,
 
-  // Count only auth failures (401). Everything else is considered "successful" and decremented.
   skipSuccessfulRequests: true,
   requestWasSuccessful: async (c) => c.res.status !== 401,
 
@@ -76,10 +80,9 @@ export const tier2ApiKeyCaptureLimiter: MiddlewareHandler = rateLimiter({
   limit: 30,
   standardHeaders: "draft-6",
   requestPropertyName: "rateLimit",
-  store: new RedisStore({ client: redisStoreClient, prefix: "rl:tier2:" }),
-  keyGenerator: async (c) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apiKey = c.get("apiKey" as any) as { id: string } | undefined;
+  store: buildStore("rl:tier2:"),
+  keyGenerator: async (c: any) => {
+    const apiKey = c.get("apiKey") as { id: string } | undefined;
     return apiKey?.id ? `key:${apiKey.id}` : `ip:${getIp(c)}`;
   },
   message: "Too many requests",
