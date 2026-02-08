@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { entityEvents, entitySources, rawNotes } from "../db/schema/index.js";
 import { createJobLogger } from "../lib/logger.js";
-import { DEFAULT_JOB_OPTS, notesExtractQueue, type NotesReprocessJob } from "./queue.js";
+import { DEFAULT_JOB_OPTS, getNotesExtractQueue, type NotesReprocessJob } from "./queue.js";
 
 export async function notesReprocessProcessor(job: Job<NotesReprocessJob>) {
   const log = createJobLogger(job);
@@ -39,7 +39,7 @@ export async function notesReprocessProcessor(job: Job<NotesReprocessJob>) {
   });
 
   try {
-    await notesExtractQueue.add(
+    await getNotesExtractQueue()!.add(
       "notes:extract",
       { rawNoteId },
       {

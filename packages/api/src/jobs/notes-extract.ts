@@ -16,7 +16,7 @@ import {
 import { createJobLogger } from "../lib/logger.js";
 import { extractEntities } from "../ai/extraction.js";
 import { tryPublishEvent } from "../services/events.js";
-import { DEFAULT_JOB_OPTS, entitiesOrganizeQueue, type NotesExtractJob } from "./queue.js";
+import { DEFAULT_JOB_OPTS, getEntitiesOrganizeQueue, type NotesExtractJob } from "./queue.js";
 
 function cleanObject<T extends Record<string, unknown>>(obj: T) {
   const out: Record<string, unknown> = {};
@@ -258,16 +258,19 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
     }
 
     if (createdEntityIds.length > 0) {
-      await entitiesOrganizeQueue.add(
-        "entities:organize",
-        { rawNoteId, entityIds: createdEntityIds },
-        {
-          ...DEFAULT_JOB_OPTS,
-          jobId: rawNoteId,
-          attempts: 5,
-          backoff: { type: "exponential", delay: 2000 + Math.floor(Math.random() * 500) },
-        }
-      );
+      const organizeQueue = getEntitiesOrganizeQueue();
+      if (organizeQueue) {
+        await organizeQueue.add(
+          "entities:organize",
+          { rawNoteId, entityIds: createdEntityIds },
+          {
+            ...DEFAULT_JOB_OPTS,
+            jobId: rawNoteId,
+            attempts: 5,
+            backoff: { type: "exponential", delay: 2000 + Math.floor(Math.random() * 500) },
+          }
+        );
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

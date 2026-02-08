@@ -4,7 +4,8 @@ import type { NoteSource, SourceMeta } from "@pm/shared";
 import { db } from "../db/index.js";
 import { rawNotes } from "../db/schema/index.js";
 import { serviceUnavailable } from "../lib/errors.js";
-import { DEFAULT_JOB_OPTS, notesExtractQueue, notesReprocessQueue } from "../jobs/queue.js";
+import { logger } from "../lib/logger.js";
+import { DEFAULT_JOB_OPTS, getNotesExtractQueue, getNotesReprocessQueue } from "../jobs/queue.js";
 
 export type CaptureNoteInput = {
   content: string;
@@ -58,24 +59,28 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
   }
 
   if (!deduped && !note.processed) {
-    try {
-      await notesExtractQueue.add(
-        "notes:extract",
-        { rawNoteId: note.id },
-        {
-          ...DEFAULT_JOB_OPTS,
-          jobId: note.id,
-          attempts: 5,
-          backoff: { type: "exponential", delay: 2000 + jitter() },
-        }
-      );
-    } catch (err) {
-      // Keep the raw note for audit; surface a 503 so clients know processing is not queued.
-      await db
-        .update(rawNotes)
-        .set({ processingError: `enqueue_failed: ${err instanceof Error ? err.message : String(err)}` })
-        .where(eq(rawNotes.id, note.id));
-      throw serviceUnavailable("Failed to enqueue note extraction");
+    const queue = getNotesExtractQueue();
+    if (!queue) {
+      logger.warn({ rawNoteId: note.id }, "Redis unavailable — note saved but extraction not queued");
+    } else {
+      try {
+        await queue.add(
+          "notes:extract",
+          { rawNoteId: note.id },
+          {
+            ...DEFAULT_JOB_OPTS,
+            jobId: note.id,
+            attempts: 5,
+            backoff: { type: "exponential", delay: 2000 + jitter() },
+          }
+        );
+      } catch (err) {
+        await db
+          .update(rawNotes)
+          .set({ processingError: `enqueue_failed: ${err instanceof Error ? err.message : String(err)}` })
+          .where(eq(rawNotes.id, note.id));
+        throw serviceUnavailable("Failed to enqueue note extraction");
+      }
     }
   }
 
@@ -91,8 +96,13 @@ export async function markNoteForReprocess(opts: { rawNoteId: string; requestedB
   });
   if (!note) return null;
 
+  const queue = getNotesReprocessQueue();
+  if (!queue) {
+    throw serviceUnavailable("Redis unavailable — cannot reprocess notes");
+  }
+
   try {
-    await notesReprocessQueue.add(
+    await queue.add(
       "notes:reprocess",
       { rawNoteId, requestedByUserId },
       {
