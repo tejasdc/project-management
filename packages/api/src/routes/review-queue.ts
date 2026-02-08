@@ -157,21 +157,31 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         resolvedByUserId: user.id,
       });
 
-      await tryPublishEvent("review_queue:resolved", {
-        id: res.item.id,
-        status: res.item.status,
-        reviewType: res.item.reviewType,
-        entityId: res.item.entityId,
-        projectId: res.item.projectId,
-      });
-
-      for (const entityId of res.effects.updatedEntityIds) {
-        await tryPublishEvent("entity:updated", { id: entityId, via: "review_queue:resolved", reviewId: res.item.id });
-        const ent = await db.query.entities.findFirst({ where: (t, q) => q.eq(t.id, entityId) });
-        if (ent?.projectId) await tryPublishEvent("project:stats_updated", { projectId: ent.projectId });
-      }
-      if (res.item.projectId) await tryPublishEvent("project:stats_updated", { projectId: res.item.projectId });
-      if (res.effects.createdProjectId) await tryPublishEvent("project:stats_updated", { projectId: res.effects.createdProjectId });
+      // Fire-and-forget: publish SSE events in background so the HTTP response is instant.
+      void (async () => {
+        try {
+          await tryPublishEvent("review_queue:resolved", {
+            id: res.item.id,
+            status: res.item.status,
+            reviewType: res.item.reviewType,
+            entityId: res.item.entityId,
+            projectId: res.item.projectId,
+          });
+          for (const entityId of res.effects.updatedEntityIds) {
+            await tryPublishEvent("entity:updated", { id: entityId, via: "review_queue:resolved", reviewId: res.item.id });
+          }
+          const projectIds = new Set<string>();
+          if (res.item.projectId) projectIds.add(res.item.projectId);
+          if (res.effects.createdProjectId) projectIds.add(res.effects.createdProjectId);
+          for (const eid of res.effects.updatedEntityIds) {
+            const ent = await db.query.entities.findFirst({ where: (t, q) => q.eq(t.id, eid) });
+            if (ent?.projectId) projectIds.add(ent.projectId);
+          }
+          for (const pid of projectIds) {
+            await tryPublishEvent("project:stats_updated", { projectId: pid });
+          }
+        } catch { /* SSE events are best-effort */ }
+      })();
 
       return c.json(res);
     }

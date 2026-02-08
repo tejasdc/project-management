@@ -1,9 +1,9 @@
 import type { Job } from "bullmq";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 
 import { CONFIDENCE_THRESHOLD } from "@pm/shared";
 import { db } from "../db/index.js";
-import { entities, entityTags, epics, projects, rawNotes, reviewQueue, tags, users } from "../db/schema/index.js";
+import { entities, entityRelationships, entityTags, epics, projects, rawNotes, reviewQueue, tags, users } from "../db/schema/index.js";
 import { createJobLogger } from "../lib/logger.js";
 import { organizeEntities } from "../ai/organization.js";
 import { tryPublishEvent } from "../services/events.js";
@@ -95,11 +95,17 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
     })),
   }));
 
-  // Recent entities sample (for duplicate context)
+  // Recent entities sample (for duplicate context).
+  // Exclude the current batch to prevent the AI from comparing entities to themselves.
   const recentEntityRows = await db
     .select()
     .from(entities)
-    .where(and(isNull(entities.deletedAt)))
+    .where(
+      and(
+        isNull(entities.deletedAt),
+        entityIds.length > 0 ? notInArray(entities.id, entityIds) : undefined,
+      )
+    )
     .orderBy(desc(entities.createdAt), desc(entities.id))
     .limit(120);
 
@@ -226,24 +232,38 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
         if (o.duplicateCandidates && o.duplicateCandidates.length > 0) {
           const best = maxBy(o.duplicateCandidates, (d) => d.similarityScore);
           if (best) {
-            const [row] = await tx
-              .insert(reviewQueue)
-              .values({
-                entityId,
-                projectId: existing.projectId ?? o.projectId ?? null,
-                reviewType: "duplicate_detection",
-                status: "pending",
-                aiSuggestion: {
-                  duplicateCandidates: o.duplicateCandidates,
-                  duplicateEntityId: best.entityId,
-                  similarityScore: best.similarityScore,
-                  explanation: best.reason,
-                } as any,
-                aiConfidence: best.similarityScore,
-              })
-              .onConflictDoNothing()
-              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
-            if (row) createdReviewItems.push(row);
+            if (best.similarityScore >= CONFIDENCE_THRESHOLD) {
+              // Auto-apply: create duplicate_of relationship directly
+              await tx
+                .insert(entityRelationships)
+                .values({
+                  sourceId: entityId,
+                  targetId: best.entityId,
+                  relationshipType: "duplicate_of",
+                  metadata: { createdBy: "ai", reason: best.reason, confidence: best.similarityScore } as any,
+                })
+                .onConflictDoNothing();
+              updatedEntityIds.push(entityId);
+            } else {
+              const [row] = await tx
+                .insert(reviewQueue)
+                .values({
+                  entityId,
+                  projectId: existing.projectId ?? o.projectId ?? null,
+                  reviewType: "duplicate_detection",
+                  status: "pending",
+                  aiSuggestion: {
+                    duplicateCandidates: o.duplicateCandidates,
+                    duplicateEntityId: best.entityId,
+                    similarityScore: best.similarityScore,
+                    explanation: best.reason,
+                  } as any,
+                  aiConfidence: best.similarityScore,
+                })
+                .onConflictDoNothing()
+                .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+              if (row) createdReviewItems.push(row);
+            }
           }
         }
       }
