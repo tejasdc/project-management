@@ -1,0 +1,12 @@
+import pino from "pino";
+import type { Job } from "bullmq";
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL ?? "info",
+  // Render and most log drains add their own timestamp. Keep logs minimal.
+  base: undefined,
+});
+
+export function createJobLogger(job: Job) {
+  return logger.child({ jobId: job.id ?? null, jobName: job.name });
+}
