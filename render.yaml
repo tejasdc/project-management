@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/api build"
+    buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/api build && cd packages/api && pnpm drizzle-kit migrate && pnpm tsx scripts/seed.ts"
     startCommand: "node packages/api/dist/server.js"
     healthCheckPath: /api/health
     buildFilter:
@@ -22,6 +22,8 @@ services:
         fromDatabase:
           name: pm-db
           property: connectionString
+      - key: CORS_ORIGINS
+        value: "https://pm-web-xqnz.onrender.com"
 
   # --- Frontend Static Site ---
   - type: web
@@ -29,6 +31,9 @@ services:
     runtime: static
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/web build"
     staticPublishPath: ./packages/web/dist
+    envVars:
+      - key: VITE_API_URL
+        value: "https://pm-api-lxwo.onrender.com"
     buildFilter:
       paths:
         - "packages/web/**"
