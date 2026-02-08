@@ -89,7 +89,7 @@ services:
     plan: starter
     region: oregon
     ipAllowList: []
-    maxmemoryPolicy: allkeys-lru
+    maxmemoryPolicy: noeviction
 
 databases:
   - name: pm-db
