@@ -1,0 +1,763 @@
+{
+  "project": "ProjectManagementAgent",
+  "branchName": "ralph/project-management-agent",
+  "description": "AI-powered project management system: capture raw notes, extract entities (Task/Decision/Insight) via Claude AI, organize into projects/epics, review low-confidence items, and manage work via CLI + web dashboard + MCP + Slack",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create shared TypeScript types and Zod schemas",
+      "description": "As a developer, I need the shared package to export all JSONB TypeScript types and Zod validation schemas used across API, web, and CLI.",
+      "acceptanceCriteria": [
+        "packages/shared/src/types.ts exports: TaskAttributes, DecisionAttributes, InsightAttributes, EntityAiMeta, EntityEvidence, FieldConfidence, ReviewSuggestion, SourceMeta variants (Slack, VoiceMemo, MeetingTranscript, Obsidian, Cli), RelationshipMeta, EntityEventMeta, EntityAttributes union, Priority, Complexity, TaskCategory",
+        "packages/shared/src/schemas.ts exports: taskAttributesSchema, decisionAttributesSchema, insightAttributesSchema, entityWithAttributesSchema (discriminated union on type), captureNoteSchema, reviewResolveSchema",
+        "packages/shared/src/constants.ts exports: ENTITY_TYPES, ENTITY_STATUSES (per type), NOTE_SOURCES, REVIEW_TYPES, REVIEW_STATUSES, CONFIDENCE_THRESHOLD (0.9)",
+        "packages/shared/src/index.ts barrel exports everything",
+        "pnpm --filter shared build succeeds with no type errors",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create Drizzle ORM enum definitions",
+      "description": "As a developer, I need all PostgreSQL enum types defined in Drizzle ORM for use in table schemas.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/enums.ts exports: entityTypeEnum (task/decision/insight), noteSourceEnum (cli/slack/voice_memo/meeting_transcript/obsidian/mcp/api), epicCreatorEnum (user/ai_suggestion), relationshipTypeEnum (derived_from/related_to/promoted_to/duplicate_of), reviewTypeEnum (7 values), reviewStatusEnum (pending/accepted/rejected/modified), projectStatusEnum (active/archived), entityEventTypeEnum (comment/status_change/reprocess)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Create users and projects Drizzle table schemas",
+      "description": "As a developer, I need the users and projects tables defined in Drizzle ORM.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/users.ts defines users table with: id (uuid PK), name (text not null), email (text not null unique), avatarUrl (text nullable), createdAt, updatedAt",
+        "packages/api/src/db/schema/projects.ts defines projects table with: id (uuid PK), name (text not null), description (text nullable), status (projectStatusEnum default 'active'), createdAt, updatedAt, deletedAt (nullable), index on status",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create epics and entities Drizzle table schemas",
+      "description": "As a developer, I need the epics and entities tables defined in Drizzle ORM with all indexes and CHECK constraints.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/epics.ts defines epics table with: id, name, description, projectId (FK to projects ON DELETE CASCADE), createdBy (epicCreatorEnum), createdAt, updatedAt, deletedAt, index on projectId",
+        "packages/api/src/db/schema/entities.ts defines entities table with: id, type (entityTypeEnum), content, status (text), projectId (FK SET NULL), epicId (FK SET NULL), parentTaskId (self-ref FK SET NULL), assigneeId (FK to users SET NULL), confidence (real default 1.0), attributes (jsonb typed), aiMeta (jsonb typed), evidence (jsonb typed), createdAt, updatedAt, deletedAt",
+        "entities table has indexes: projectId, epicId, assigneeId, parentTaskId, composite (projectId/type/status), confidence, partial active index (WHERE deleted_at IS NULL)",
+        "entities table has CHECK constraints: valid_entity_status (type+status combos), parent_task_only_for_tasks",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create raw_notes, entity_sources, and entity_relationships table schemas",
+      "description": "As a developer, I need the raw notes capture table, the entity-to-note provenance join table, and the entity graph relationships table.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/raw-notes.ts defines rawNotes table with: id, content, source (noteSourceEnum), externalId, sourceMeta (jsonb typed), capturedBy (FK to users), capturedAt, processed (boolean default false), processedAt, processingError, createdAt. Indexes: partial on unprocessed+capturedAt, source, capturedBy, capturedAt, unique partial on (source, externalId) WHERE externalId IS NOT NULL",
+        "packages/api/src/db/schema/entity-sources.ts defines entitySources join table with composite PK (entityId, rawNoteId), both FK cascade, createdAt column, index on rawNoteId",
+        "packages/api/src/db/schema/entity-relationships.ts defines entityRelationships with: id, sourceId (FK cascade), targetId (FK cascade), relationshipType (relationshipTypeEnum), metadata (jsonb typed), createdAt. Indexes: sourceId, targetId, type, composite source+type, unique (source/target/type)",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Create tags, entity_tags, review_queue, entity_events, and api_keys table schemas",
+      "description": "As a developer, I need the remaining table schemas for tags, review queue, activity log, and API key auth.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/tags.ts defines tags table with: id, name (text unique), createdAt",
+        "packages/api/src/db/schema/entity-tags.ts defines entityTags join table with composite PK (entityId, tagId), both FK cascade, createdAt column",
+        "packages/api/src/db/schema/review-queue.ts defines reviewQueue table with all columns from database-schema.md including: entityId (nullable FK), projectId (nullable FK), reviewType, status, aiSuggestion/aiConfidence, resolvedBy/resolvedAt/userResolution, trainingComment. Indexes: partial pending, entityId, projectId, reviewType, resolved status, unique partial (entityId+reviewType WHERE pending). CHECK: at least one of entityId or projectId not null",
+        "packages/api/src/db/schema/entity-events.ts defines entityEvents table: id, entityId (FK cascade), type (entityEventTypeEnum), actorUserId (FK), rawNoteId (FK), body, oldStatus, newStatus, meta (jsonb), createdAt. Indexes: composite (entityId, createdAt), actorUserId",
+        "packages/api/src/db/schema/api-keys.ts defines apiKeys table: id, userId (FK cascade), name, keyHash (unique), lastUsedAt, revokedAt, createdAt. Indexes: userId, keyHash unique, composite (keyHash, revokedAt)",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create Drizzle relations and schema barrel export",
+      "description": "As a developer, I need Drizzle relational query hints and a single barrel export for the entire schema.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/schema/relations.ts defines all Drizzle relations: usersRelations, projectsRelations, epicsRelations, entitiesRelations (with parentTask/subtasks self-ref, entitySources, entityTags, outgoing/incomingRelationships, reviews, events), rawNotesRelations, entitySourcesRelations, entityRelationshipsRelations, tagsRelations, entityTagsRelations, reviewQueueRelations, entityEventsRelations, apiKeysRelations",
+        "packages/api/src/db/schema/index.ts barrel exports everything from all schema files",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Set up Drizzle config, database connection, migration, triggers, and lineage function",
+      "description": "As a developer, I need the Drizzle ORM configuration, database client setup, and the first migration — including the set_updated_at() trigger function applied to relevant tables and the get_entity_lineage() recursive CTE function.",
+      "acceptanceCriteria": [
+        "packages/api/drizzle.config.ts configures: schema path, out directory for migrations, PostgreSQL dialect, dbCredentials from DATABASE_URL env var",
+        "packages/api/src/db/index.ts exports a configured Drizzle client using node-postgres (pg) with the full schema",
+        "packages/api/package.json has scripts: db:generate (drizzle-kit generate), db:migrate (drizzle-kit migrate), db:push (drizzle-kit push), db:studio (drizzle-kit studio)",
+        "Migration includes SQL for set_updated_at() trigger function that sets updated_at = NOW() on row update",
+        "set_updated_at trigger applied to: users, projects, epics, entities, review_queue tables",
+        "Migration includes get_entity_lineage(entity_id UUID, direction TEXT, max_depth INT, relationship_types TEXT[]) function as recursive CTE per database-schema.md spec",
+        "get_entity_lineage supports direction: 'ancestors', 'descendants', 'both' with cycle detection and max_depth safety limit",
+        "Running pnpm --filter api db:generate creates migration files for the full schema including triggers and functions",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Merged from old US-037 — triggers and functions must be in the initial migration, not a later story, because other code depends on updated_at being auto-set."
+    },
+    {
+      "id": "US-009",
+      "title": "Create Drizzle-Zod validation schemas",
+      "description": "As a developer, I need auto-generated Zod schemas from Drizzle tables for API request validation.",
+      "acceptanceCriteria": [
+        "packages/api/src/db/validation.ts exports: entityInsertSchema (with content min(1), confidence 0-1), entitySelectSchema, rawNoteInsertSchema (content min(1)), rawNoteSelectSchema, projectInsertSchema (name min(1)), projectSelectSchema, epicInsertSchema (name min(1)), epicSelectSchema, reviewQueueInsertSchema, reviewQueueSelectSchema",
+        "Custom Zod schemas for JSONB: taskAttributesSchema, decisionAttributesSchema, insightAttributesSchema, entityWithAttributesSchema (discriminated union)",
+        "drizzle-zod and zod are installed as dependencies",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Create Hono app entrypoint with health check",
+      "description": "As a developer, I need the Hono API server entrypoint with CORS middleware and a health check endpoint.",
+      "acceptanceCriteria": [
+        "packages/api/src/index.ts creates a Hono app with CORS middleware driven by CORS_ORIGINS env var (credentials: false, preflight cache: 24 hours)",
+        "Middleware chain order: CORS → Public route check → Auth middleware → Zod validation → Route handler",
+        "GET /api/health returns { status: 'ok', timestamp, checks: { db: { status, latencyMs }, redis: { status, latencyMs } } } when healthy, or 503 with { status: 'degraded' } when not",
+        "Health check endpoint does NOT require authentication (public route)",
+        "Each health check has a 5-second timeout",
+        "App exports its type for Hono RPC (typeof app)",
+        "packages/api/src/server.ts starts the server on PORT env var (default 3000)",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement API key auth service and middleware",
+      "description": "As a developer, I need the auth service (key generation, SHA-256 hashing) and Hono middleware that validates Bearer tokens.",
+      "acceptanceCriteria": [
+        "packages/api/src/services/auth.ts exports: generateApiKey() returns { plaintextKey: string, keyHash: string } with pm_live_ prefix and 32 hex chars, hashApiKey(plaintext) returns SHA-256 hash using Web Crypto API (crypto.subtle), validateApiKey(plaintext) looks up hash in api_keys WHERE revoked_at IS NULL and returns user+apiKey or null",
+        "packages/api/src/middleware/auth.ts exports Hono middleware that: checks Authorization Bearer header, calls validateApiKey, returns 401 with standard error envelope on failure (same message for not-found and revoked to prevent enumeration), sets c.set('user') and c.set('apiKey') on success, fires non-blocking last_used_at update",
+        "packages/api/src/types/env.ts exports AppEnv type with Variables: { user: User, apiKey: ApiKey }",
+        "Public routes (GET /api/health, GET /api/mcp) skip auth middleware",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement auth routes (me, api-keys, users)",
+      "description": "As a developer, I need the auth and user management API endpoints.",
+      "acceptanceCriteria": [
+        "GET /api/auth/me returns the authenticated user from context",
+        "POST /api/auth/api-keys creates a new named API key and returns the plaintext once",
+        "GET /api/auth/api-keys lists API keys for the authenticated user (no plaintext)",
+        "POST /api/auth/api-keys/:id/revoke sets revoked_at on the key",
+        "GET /api/users lists all users with optional ?q= search",
+        "POST /api/users creates a new user (requires name, email)",
+        "All endpoints return standard error envelope on failure",
+        "All endpoints require auth (except already excluded public routes)",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Create database seed script",
+      "description": "As a developer, I need a seed script that creates the first user and API key for bootstrapping.",
+      "acceptanceCriteria": [
+        "packages/api/scripts/seed.ts checks if any users exist; if zero, creates default user + named API key",
+        "Seed script prints the plaintext API key to stdout exactly once",
+        "If users already exist, prints message and exits (idempotent)",
+        "packages/api/package.json has db:seed script that runs the seed",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Implement standard error handling and Pino logging",
+      "description": "As a developer, I need consistent error responses and structured logging across the API.",
+      "acceptanceCriteria": [
+        "packages/api/src/lib/errors.ts exports AppError class and error factory functions for each code (BAD_REQUEST, UNAUTHORIZED, NOT_FOUND, CONFLICT, VALIDATION_ERROR, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE)",
+        "Hono error handler middleware returns standard envelope: { error: { code, message, status, details?, requestId? } }",
+        "Pino logger configured with requestId, userId in every log line",
+        "Log levels: fatal (process must exit), error (unhandled exceptions, failed jobs after all retries), warn (slow queries >1s, API key near rate limit, Claude API retry), info (significant events, default prod level), debug (SQL queries, Claude API shape, BullMQ payload), trace (full HTTP bodies, never in prod)",
+        "BullMQ workers use same Pino instance with jobId, jobName, and entity/note IDs for correlation",
+        "422 VALIDATION_ERROR includes Zod issues[] in details",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Implement project and epic CRUD routes",
+      "description": "As a developer, I need the project and epic management API endpoints.",
+      "acceptanceCriteria": [
+        "GET /api/projects returns active projects, supports ?status and ?includeDeleted filters",
+        "POST /api/projects creates a project with Zod-validated body",
+        "PATCH /api/projects/:id updates name/description/status",
+        "GET /api/projects/:id/dashboard returns: project, stats (tasksByStatus, openDecisions, recentInsights), epics with summary, recentEntities",
+        "GET /api/epics returns epics filtered by ?projectId, supports ?includeDeleted",
+        "POST /api/epics creates an epic (projectId required)",
+        "PATCH /api/epics/:id updates name/description",
+        "All list endpoints use cursor pagination (default limit: 50, max limit: 100, cursor is opaque string, response includes nextCursor: string | null)",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement entity CRUD routes",
+      "description": "As a developer, I need entity management API endpoints for listing, detail, update, create, events, and status change.",
+      "acceptanceCriteria": [
+        "GET /api/entities supports filters: projectId, epicId, type, status, assigneeId, tagId, includeDeleted, limit, cursor",
+        "GET /api/entities/:id returns full entity record",
+        "PATCH /api/entities/:id updates editable fields (status, projectId, epicId, assigneeId, content, attributes) with Zod validation using entityWithAttributesSchema for attributes",
+        "POST /api/entities creates an entity (for manual create or promote insight to task)",
+        "GET /api/entities/:id/events returns audit trail (comments, status changes, reprocess) with pagination",
+        "POST /api/entities/:id/events adds a comment (type: 'comment', body: string)",
+        "POST /api/entities/:id/status changes status atomically and creates entity_event record with old/new status",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement note capture endpoint with idempotent ingestion",
+      "description": "As a developer, I need the unified capture_note endpoint that creates raw notes and enqueues extraction.",
+      "acceptanceCriteria": [
+        "POST /api/notes/capture accepts { content, source, sourceMeta?, capturedAt?, externalId? } validated by captureNoteSchema",
+        "Returns 201 with { note, deduped: false } on new note creation",
+        "Returns 200 with { note, deduped: true } when (source, externalId) already exists",
+        "Enqueues a notes:extract BullMQ job on successful creation (not on dedup)",
+        "GET /api/notes lists raw notes with filters: processed, source, capturedBy, since, until, limit, cursor",
+        "POST /api/notes/:id/reprocess resets processed=false, clears processingError, creates reprocess entity_event, re-enqueues extraction",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Set up BullMQ queue infrastructure with Redis",
+      "description": "As a developer, I need BullMQ queue and worker setup connected to Redis for background job processing.",
+      "acceptanceCriteria": [
+        "packages/api/src/jobs/queue.ts exports queue instances for: notes:extract, entities:organize, entities:compute-embeddings, review-queue:export-training-data, notes:reprocess",
+        "Redis connection configured via REDIS_URL env var with reconnection strategy",
+        "packages/api/src/worker.ts is a standalone worker entrypoint that processes jobs from all queues",
+        "Worker concurrency configurable via BULLMQ_CONCURRENCY env var (default 5)",
+        "Each job payload includes a stable id (rawNoteId, entityId, etc.) for idempotency",
+        "packages/api/package.json has worker script: pnpm worker starts the worker process",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Implement Phase A entity extraction (Claude API + Zod)",
+      "description": "As a developer, I need the AI extraction module that calls Claude API with tool_use to extract entities from raw notes.",
+      "acceptanceCriteria": [
+        "packages/api/src/ai/extraction.ts exports extractEntities() that: builds the system prompt with entity type definitions and extraction principles, constructs user message with raw note content + source metadata, calls Claude API with tool_use (extract_entities tool), validates response with extractionResultSchema Zod schema, returns typed ExtractionResult (entities + relationships)",
+        "packages/api/src/ai/schemas/extraction-schema.ts exports extractionResultSchema Zod schema as a standalone artifact matching the schema from docs/extraction-prompts.md",
+        "Uses zodToJsonSchema to convert Zod schema to Claude tool input_schema",
+        "Uses tool_choice: { type: 'tool', name: 'extract_entities' } to force structured output",
+        "On Zod validation failure: retries once with validation error appended, then throws",
+        "System prompt includes all 3 few-shot examples from extraction-prompts.md (CLI quick capture, Slack thread, meeting transcript)",
+        "Extracted entities include aiMeta with: { model, promptVersion, extractedAt, tokenUsage: { input, output } } format",
+        "Evidence fields include: { quote, rawNoteId (to be injected by job processor), confidence } per extraction-prompts.md spec",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Implement Phase B entity organization (Claude API + Zod)",
+      "description": "As a developer, I need the AI organization module that assigns entities to projects, epics, detects duplicates, and resolves assignees.",
+      "acceptanceCriteria": [
+        "packages/api/src/ai/organization.ts exports organizeEntities() that: builds system prompt with organization rules, constructs user message with extracted entities + active projects/epics + recent entities + known users, calls Claude API with tool_use (organize_entities tool), validates with organizationResultSchema",
+        "packages/api/src/ai/schemas/organization-schema.ts exports organizationResultSchema Zod schema as a standalone artifact matching the schema from docs/extraction-prompts.md",
+        "System prompt includes the few-shot example from extraction-prompts.md showing multi-entity organization with project routing and epic suggestion",
+        "Returns typed OrganizationResult with: entityOrganizations (project/epic/assignee assignments + duplicate candidates per entity) and epicSuggestions",
+        "Each assignment includes confidence score and reasoning",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Implement notes:extract BullMQ job processor",
+      "description": "As a developer, I need the job processor that runs extraction on raw notes and writes results to the database.",
+      "acceptanceCriteria": [
+        "packages/api/src/jobs/notes-extract.ts processes notes:extract jobs",
+        "Loads raw note by ID, calls extractEntities() with note content + source metadata",
+        "In a single DB transaction: inserts entities with correct status/attributes/confidence/aiMeta/evidence, inserts entity_sources links, inserts entity_relationships (intra-note), sets raw_notes.processed=true and processedAt",
+        "Evidence rawNoteId field is injected by the job processor (not by the AI) — sets each evidence item's rawNoteId to the source note's ID for provenance linking",
+        "Evidence permalink is computed from source metadata (e.g., Slack message URL, Obsidian vault path) and stored in evidence for UI linking",
+        "Entities with field-level confidence below CONFIDENCE_THRESHOLD (0.9) get corresponding review_queue items created (e.g., low-confidence type → type_classification review)",
+        "On extraction failure: sets raw_notes.processing_error with error message, keeps processed=false",
+        "On success: enqueues entities:organize job with list of newly created entity IDs",
+        "Retry policy: 5 attempts, exponential backoff with jitter; do not retry on deterministic Zod mismatch after N tries",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement entities:organize BullMQ job processor",
+      "description": "As a developer, I need the job processor that runs Phase B organization and writes project/epic assignments + review queue items.",
+      "acceptanceCriteria": [
+        "packages/api/src/jobs/entities-organize.ts processes entities:organize jobs",
+        "Loads extracted entities, fetches active projects with epics, fetches recent entities for dedup, fetches known users",
+        "Calls organizeEntities() and applies results: sets entity.projectId, epicId, assigneeId based on high-confidence assignments",
+        "Creates review_queue entries for: any assignment with confidence < 0.9, duplicate candidates, epic suggestions, low-confidence type classifications",
+        "Review queue items include proper reviewType, aiSuggestion (with all fields), aiConfidence",
+        "Retry policy: 5 attempts, exponential backoff",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Implement review queue list endpoint and resolve framework",
+      "description": "As a developer, I need the review queue list endpoint and the base resolve framework that handles common resolution logic (transaction, entity_events, status update).",
+      "acceptanceCriteria": [
+        "GET /api/review-queue lists items with filters: status, projectId, entityId, reviewType, limit, cursor",
+        "Default batching order: grouped by project, then by entity within project, then by dependency order within entity (type_classification first, then project_assignment, epic_assignment, assignee_suggestion, duplicate_detection)",
+        "POST /api/review-queue/:id/resolve resolves a single item with: { status: 'accepted'|'rejected'|'modified', userResolution?, trainingComment? }",
+        "Resolution is atomic (transaction): updates review item status/resolvedBy/resolvedAt + appends entity_events audit trail entry",
+        "POST /api/review-queue/resolve-batch resolves multiple items atomically in a single transaction",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": "Split from original US-023 — this story handles the list endpoint and resolve transaction framework. US-024 handles per-reviewType resolution logic."
+    },
+    {
+      "id": "US-024",
+      "title": "Implement per-reviewType resolution logic",
+      "description": "As a developer, I need the specific resolution logic for each review type, applied within the resolve transaction from US-023.",
+      "acceptanceCriteria": [
+        "type_classification resolution: updates entity.type, resets status to valid default for new type (satisfies DB CHECK), re-validates attributes via entityWithAttributesSchema, auto-rejects other now-nonsensical pending reviews for the same entity, records old values in entity_events.meta snapshot",
+        "project_assignment resolution: sets/clears entity.project_id based on accepted/rejected/modified",
+        "epic_assignment resolution: sets/clears entity.epic_id",
+        "assignee_suggestion resolution: sets/clears entity.assignee_id",
+        "duplicate_detection accepted: creates duplicate_of entity_relationship edge between source and target entities",
+        "epic_creation accepted: creates new epic row with created_by='ai_suggestion' and optionally creates follow-up epic_assignment review items for candidate entities",
+        "epic_creation modified: creates epic using user-provided name/description from userResolution",
+        "Edge case: entity type change during review reconciles other pending reviews (marks now-nonsensical items as rejected with system resolution)",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": "Split from original US-023 — this story handles the complex per-reviewType branching logic."
+    },
+    {
+      "id": "US-025",
+      "title": "Implement tag routes",
+      "description": "As a developer, I need the tag management API endpoints.",
+      "acceptanceCriteria": [
+        "GET /api/tags lists all tags with optional ?q= search",
+        "POST /api/tags creates a tag (name required, unique)",
+        "PUT /api/entities/:id/tags replaces all tags on an entity with provided tagIds array",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Implement rate limiting middleware",
+      "description": "As a developer, I need two-tier rate limiting for brute-force protection and capture spam prevention.",
+      "acceptanceCriteria": [
+        "Tier 1: IP-based, 15-minute window, max 20 failed auth attempts per IP (counts 401 responses only), applied before auth middleware",
+        "Tier 2: API-key-based, 1-minute window, max 30 requests per key, scoped to POST /api/notes/capture only, applied after auth middleware",
+        "Rate limit exceeded returns 429 with { error: { code: 'RATE_LIMITED', retryAfter: number } }",
+        "Uses hono-rate-limiter with Redis store (survives redeploys)",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Set up Vitest test infrastructure with testcontainers",
+      "description": "As a developer, I need the testing framework and utilities so all packages can write and run tests.",
+      "acceptanceCriteria": [
+        "Vitest configured in workspace mode at repo root — runs all four packages (shared, api, web, cli) from pnpm test",
+        "packages/api/tests/setup.ts configures @testcontainers/postgresql: spins up real Postgres container, runs Drizzle migrations before suite, each test wrapped in a transaction that rolls back",
+        "packages/api/tests/factories.ts exports factory functions: createTestUser(), createTestProject(), createTestEntity(), createTestRawNote(), createTestApiKey() — all accept partial overrides, no static SQL seed files",
+        "packages/api/tests/helpers.ts exports test helpers: authenticated app.request() wrapper, expectError() for asserting standard error envelope shape",
+        "packages/shared has Vitest config for unit tests (pure functions, Zod schema validation positive + negative cases)",
+        "packages/web has Vitest + @testing-library/react config for component tests",
+        "packages/cli has Vitest config for unit + mock API integration tests",
+        "Coverage thresholds configured: shared 90%, api 70%, cli 70%, web no numeric mandate",
+        "pnpm test runs all package tests; pnpm test --filter api runs API tests only",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": "Testing strategy from docs/project-management-agent.md Testing Strategy section. AI extraction tests use fixture-based schema validation (every PR) and real Claude API integration (nightly, gated behind TEST_AI_INTEGRATION=true)."
+    },
+    {
+      "id": "US-028",
+      "title": "Build CLI tool: config, capture, and project listing",
+      "description": "As a user, I want a CLI tool to configure API access, capture notes, and list projects.",
+      "acceptanceCriteria": [
+        "packages/cli/src/index.ts is the CLI entrypoint using commander or citty",
+        "pm config sets API URL and API key, stores in ~/.pm/config.json",
+        "pm capture '<text>' creates a raw note via POST /api/notes/capture with source: 'cli'",
+        "pm projects lists all active projects with name and ID",
+        "pm tasks lists tasks with optional --project, --status, --assignee filters",
+        "packages/cli/package.json has bin field for global install (pm command)",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Build CLI tool: status updates and review",
+      "description": "As a user, I want to update task status and review low-confidence items from the CLI.",
+      "acceptanceCriteria": [
+        "pm status <entity-id> <new-status> calls POST /api/entities/:id/status and prints result",
+        "pm review lists pending review items with AI suggestions, shows entity content + confidence",
+        "pm review supports interactive accept/reject/modify flow for each item",
+        "All CLI output is formatted for terminal readability (colors, tables)",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-030",
+      "title": "Build CLI tool: session-sync command",
+      "description": "As a user, I want to sync Claude Code session files into the PM system as captured notes.",
+      "acceptanceCriteria": [
+        "pm session-sync reads Claude Code session files from the local filesystem",
+        "Uploads each session as a raw note via POST /api/notes/capture with source: 'cli' and appropriate sourceMeta",
+        "Deduplication via externalId prevents re-uploading previously synced sessions",
+        "Prints summary of new vs skipped (deduped) sessions",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": "Phase 5 feature. Requires careful dedup handling."
+    },
+    {
+      "id": "US-031",
+      "title": "Set up web frontend foundation (Vite + React + TanStack Router + dark theme + error boundaries)",
+      "description": "As a developer, I need the web app scaffolding with routing, API client, design system, and error handling layers. Use the frontend-design skill for implementation. Reference all mockups in mockups/ folder for the dark industrial design system.",
+      "acceptanceCriteria": [
+        "packages/web/vite.config.ts configured with Vite + React plugin and API proxy ('/api' → 'http://localhost:3000') for dev",
+        "TanStack Router set up with file-based routing in src/routes/",
+        "packages/web/src/lib/api-client.ts exports Hono RPC (hc) client configured with API base URL and auth header",
+        "packages/web/src/lib/query-keys.ts exports TanStack Query key factory for projects, entities, reviews, etc.",
+        "Tailwind v4 configured with dark industrial theme: #0C0E14 base background, entity-type color tokens (amber=tasks, blue=decisions, emerald=insights), confidence spectrum (green/amber/red) — reference mockups/projects-dashboard.html for color palette and spacing",
+        "Fonts configured: Bricolage Grotesque (headings), DM Sans (body), JetBrains Mono (code/IDs/confidence)",
+        "packages/web/src/components/layout/ has AppShell, Sidebar, Header components — reference mockups/projects-dashboard.html for layout structure",
+        "shadcn/ui components customized for dark theme in src/components/ui/",
+        "Zustand store for UI state (sidebar, modals) in src/stores/ui.ts",
+        "Global error boundary (React ErrorBoundary at router root): full-page 'Something went wrong' with reload button",
+        "Route-level error boundary (TanStack Router errorComponent per route): error within the route layout, not full-page crash",
+        "TanStack Query error handling: queries show inline error states with retry buttons; mutations show toast notifications via shadcn/ui Sonner; don't retry 4xx errors",
+        "pnpm --filter web dev starts at localhost:5173",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": "Use the frontend-design skill for design system implementation. Reference mockups/ folder for visual design: projects-dashboard.html, review-queue.html, entity-detail.html, project-view.html, quick-capture.html, settings.html."
+    },
+    {
+      "id": "US-032",
+      "title": "Build review queue page",
+      "description": "As a user, I want to review low-confidence AI decisions in the web app. Use the frontend-design skill for implementation. Reference mockups/review-queue.html for the visual design.",
+      "acceptanceCriteria": [
+        "src/routes/review.tsx displays pending review items fetched via TanStack Query",
+        "Items grouped by project, then by entity within project, following the batching order from the design doc",
+        "Each ReviewCard shows: entity content, AI suggestion with confidence badge, review type label",
+        "ConfidenceBadge component shows green (>=0.9), amber (0.7-0.9), red (<0.7) with percentage, using JetBrains Mono font",
+        "Accept button applies AI suggestion (POST /api/review-queue/:id/resolve with status: 'accepted')",
+        "Reject button dismisses suggestion",
+        "Modify action allows user to provide different answer",
+        "Training comment input for corrections",
+        "Resolved items disappear from the list (query refetch or optimistic update)",
+        "Visual design matches mockups/review-queue.html",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": "Use the frontend-design skill. Reference mockups/review-queue.html for visual design specification."
+    },
+    {
+      "id": "US-033",
+      "title": "Build project list and project dashboard pages",
+      "description": "As a user, I want to see all projects and drill into a project's details. Use the frontend-design skill for implementation. Reference mockups/projects-dashboard.html and mockups/project-view.html for visual design.",
+      "acceptanceCriteria": [
+        "src/routes/projects.tsx lists all active projects as ProjectCards with: name, task count by status, open decisions count, recent insights count — matches mockups/projects-dashboard.html layout",
+        "Clicking a project navigates to src/routes/projects.$projectId.tsx",
+        "Project detail page shows: project name/description, epic list with EpicProgress bars (computed from child task statuses), entity list filterable by type/status/assignee/epic, ungrouped entities section — matches mockups/project-view.html layout",
+        "TypeBadge component color-codes entity types (amber=task, blue=decision, emerald=insight)",
+        "All filters persisted in URL search params via TanStack Router",
+        "Visual design matches mockups/projects-dashboard.html and mockups/project-view.html",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": "Use the frontend-design skill. Reference mockups/projects-dashboard.html (project list) and mockups/project-view.html (project detail) for visual design."
+    },
+    {
+      "id": "US-034",
+      "title": "Build entity detail page",
+      "description": "As a user, I want to see full details of an entity including evidence, attributes, and activity timeline. Use the frontend-design skill for implementation. Reference mockups/entity-detail.html for visual design.",
+      "acceptanceCriteria": [
+        "src/routes/entities.$entityId.tsx shows: entity type badge, content, status, project/epic assignments, assignee, confidence score",
+        "Attributes section renders type-specific fields (category/priority/complexity for tasks, options/chosen/rationale for decisions, sentiment/dataPoints for insights)",
+        "Evidence section shows source quotes with raw note references and permalink links where available",
+        "Activity timeline shows entity_events in chronological order (comments, status changes, reprocessing)",
+        "Inline status change dropdown",
+        "Add comment form at the bottom of the timeline",
+        "Visual design matches mockups/entity-detail.html",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": "Use the frontend-design skill. Reference mockups/entity-detail.html for visual design specification."
+    },
+    {
+      "id": "US-035",
+      "title": "Implement SSE endpoint for real-time updates",
+      "description": "As a developer, I need a Server-Sent Events endpoint so the web app can receive real-time updates.",
+      "acceptanceCriteria": [
+        "GET /api/sse is an authenticated SSE endpoint using Hono's streamSSE()",
+        "Streams events: review_queue:created, review_queue:resolved, entity:created, entity:updated, entity:event_added, raw_note:processed, project:stats_updated",
+        "packages/api/src/services/events.ts implements an event bus (Node EventEmitter or Redis pub/sub) that route handlers emit to",
+        "Web app connects to SSE on mount and triggers TanStack Query invalidation on relevant events",
+        "SSE client implements reconnection with exponential backoff",
+        "Web app shows real-time badge count on sidebar for pending review items",
+        "Typecheck passes"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-036",
+      "title": "Implement MCP server with 9 tools",
+      "description": "As an AI agent user, I want MCP tools so Claude Code can interact with the project management system.",
+      "acceptanceCriteria": [
+        "packages/api/src/mcp/server.ts sets up MCP server using @modelcontextprotocol/sdk + @modelcontextprotocol/hono",
+        "9 tools implemented: capture_note, list_projects, get_project_dashboard, list_tasks, pick_next_task, update_task_status, get_entity, add_entity_comment, list_review_queue",
+        "Each tool has typed input schema (from Zod) and calls the corresponding API endpoint/service",
+        "pick_next_task returns highest-priority unstarted task for a project, falling back to most recently created",
+        "MCP manifest endpoint at GET /api/mcp is public (no auth for discovery)",
+        "Tool execution requires auth via API key in MCP client config",
+        "Typecheck passes"
+      ],
+      "priority": 36,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-037",
+      "title": "Build quick capture modal in web app",
+      "description": "As a user, I want a fast way to capture notes from the web app without navigating to a separate page. Use the frontend-design skill for implementation. Reference mockups/quick-capture.html for visual design.",
+      "acceptanceCriteria": [
+        "src/components/QuickCapture.tsx is a modal triggered by Cmd+K (Mac) or Ctrl+K",
+        "Also accessible via a floating action button or header icon",
+        "Text input with submit that calls POST /api/notes/capture with source: 'api'",
+        "Shows success toast on capture with link to the created note",
+        "Modal closes on successful capture",
+        "Visual design matches mockups/quick-capture.html",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 37,
+      "passes": false,
+      "notes": "Use the frontend-design skill. Reference mockups/quick-capture.html for visual design specification."
+    },
+    {
+      "id": "US-038",
+      "title": "Build settings page with API key management",
+      "description": "As a user, I want to manage my API keys from the web app settings page. Use the frontend-design skill for implementation. Reference mockups/settings.html for visual design.",
+      "acceptanceCriteria": [
+        "src/routes/settings.tsx shows list of user's API keys with: name, created date, last used date, revoked status",
+        "Create new key button: name input, generates key, shows plaintext ONCE with copy button",
+        "Revoke button per key with confirmation dialog",
+        "Visual design matches mockups/settings.html",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 38,
+      "passes": false,
+      "notes": "Use the frontend-design skill. Reference mockups/settings.html for visual design specification."
+    },
+    {
+      "id": "US-039",
+      "title": "Mount Bull Board admin dashboard for job queue monitoring",
+      "description": "As a developer, I need a Bull Board UI to monitor BullMQ job queues for debugging and operations.",
+      "acceptanceCriteria": [
+        "@bull-board/hono and @bull-board/api installed as dependencies",
+        "packages/api/src/routes/admin.ts mounts Bull Board at /admin/queues behind auth middleware",
+        "Dashboard shows all queues: notes:extract, entities:organize, entities:compute-embeddings, review-queue:export-training-data, notes:reprocess",
+        "Dashboard shows job history, retry controls, and failed job details",
+        "Typecheck passes"
+      ],
+      "priority": 39,
+      "passes": false,
+      "notes": "Phase 6 feature. Bull Board provides essential visibility into background job processing."
+    },
+    {
+      "id": "US-040",
+      "title": "Implement Slack Bot with capture and emoji reaction handlers",
+      "description": "As a team member, I want to capture notes via Slack using a slash command or by pinning messages with an emoji reaction.",
+      "acceptanceCriteria": [
+        "packages/api/src/integrations/slack/app.ts sets up Slack Bolt app with event subscriptions",
+        "/capture slash command: extracts text after command, builds SourceMeta with Slack channel/user/timestamp, calls captureService.capture() with source: 'slack'",
+        "Pushpin emoji (📌) reaction handler: when pushpin is added to any message, captures that message text as a raw note with source: 'slack' and full Slack context in sourceMeta",
+        "packages/api/src/integrations/slack/handlers.ts extracts message text + context, builds SourceMeta, calls capture service",
+        "render.yaml updated with Slack token environment variables (SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET)",
+        "Typecheck passes"
+      ],
+      "priority": 40,
+      "passes": false,
+      "notes": "Phase 6 feature. Slack Bolt SDK setup is well-documented. Done when: '/capture We need to redesign the onboarding flow' creates a raw note, and adding pushpin emoji to any message captures it."
+    },
+    {
+      "id": "US-041",
+      "title": "Add PWA support to web app",
+      "description": "As a mobile user, I want to install the web app as a Progressive Web App on my phone.",
+      "acceptanceCriteria": [
+        "vite-plugin-pwa configured in vite.config.ts",
+        "public/manifest.json with app name, icons, theme color (#0C0E14), display: standalone",
+        "App icons in public/ for various sizes",
+        "Service worker for offline caching of static assets",
+        "On mobile Chrome/Safari, 'Add to Home Screen' installs the PWA with correct icon and name",
+        "Mobile review queue is usable (cards stack vertically, action buttons accessible)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": "Phase 7 feature."
+    },
+    {
+      "id": "US-042",
+      "title": "Implement entities:compute-embeddings job processor",
+      "description": "As a developer, I need the job processor that computes embedding vectors for entities when pgvector is added, enabling fast duplicate candidate search.",
+      "acceptanceCriteria": [
+        "packages/api/src/jobs/entities-compute-embeddings.ts processes entities:compute-embeddings jobs",
+        "Enqueued when an entity is created or updated (content change)",
+        "Computes embedding vector for entity content (placeholder implementation if pgvector not yet added — store as JSON field or skip gracefully)",
+        "Retry policy: 3 attempts, exponential backoff",
+        "Job is async from organize pipeline (can run in parallel)",
+        "Typecheck passes"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": "Future-ready: currently a placeholder until pgvector is added. The queue and processor structure should exist so it can be activated later."
+    },
+    {
+      "id": "US-043",
+      "title": "Implement training data export endpoint and job",
+      "description": "As a developer, I need the admin endpoint and cron job that export resolved review queue items as JSONL training data for DSPy.",
+      "acceptanceCriteria": [
+        "POST /api/admin/export-training-data triggers review-queue:export-training-data job",
+        "packages/api/src/jobs/export-training-data.ts processes the job: queries resolved review items with training_comment or status in ('rejected','modified'), exports JSONL",
+        "Each JSONL line contains: raw_notes.content (via entity_sources), entity snapshot before resolution, aiSuggestion + aiConfidence + aiMeta (model/promptVersion), resolved correct value (aiSuggestion if accepted, userResolution if modified, null if rejected), trainingComment as rationale",
+        "Output written to configurable path or returned via API response",
+        "Retry policy: 3 attempts",
+        "Typecheck passes"
+      ],
+      "priority": 43,
+      "passes": false,
+      "notes": "Phase 8 prerequisite. Nightly cron in render.yaml runs at 3AM UTC."
+    },
+    {
+      "id": "US-044",
+      "title": "Set up DSPy Python sidecar worker",
+      "description": "As a developer, I need the Python sidecar that consumes training data and optimizes extraction prompts using DSPy.",
+      "acceptanceCriteria": [
+        "packages/dspy-worker/ directory with pyproject.toml (dependencies: dspy, litellm, psycopg2-binary, pydantic)",
+        "packages/dspy-worker/src/signatures.py defines DSPy Signatures mirroring the Zod extraction schemas",
+        "packages/dspy-worker/src/optimizer.py loads training JSONL, runs BootstrapFewShot optimizer, outputs optimized prompt config JSON",
+        "packages/dspy-worker/src/worker.py polls or consumes from Redis queue, runs extraction using optimized prompts",
+        "packages/dspy-worker/src/export.py can export JSONL from review_queue directly (alternative to API endpoint)",
+        "packages/dspy-worker/Dockerfile for Render deployment",
+        "Running the optimizer with 20+ training examples produces an optimized prompt config",
+        "Typecheck passes (Python: mypy or pyright clean)"
+      ],
+      "priority": 44,
+      "passes": false,
+      "notes": "Phase 8. Only start after 20-50 review corrections accumulated. Requires real-world usage data, not just code."
+    },
+    {
+      "id": "US-045",
+      "title": "Update render.yaml with all services and infrastructure",
+      "description": "As a developer, I need the render.yaml to declare all infrastructure for zero-manual-creation deployment.",
+      "acceptanceCriteria": [
+        "render.yaml declares: pm-api (web service, Node, starter plan), pm-worker (worker service, Node, starter plan), pm-web (static site, starter plan), pm-redis (keyvalue, noeviction, starter plan), pm-training-export (cron, nightly 3AM UTC, node, runs dist/jobs/export-training-data.js), pm-postgres (database, starter plan, v16), pm-dspy-worker (worker service, Docker, starter plan)",
+        "pm-shared-secrets env var group includes: ANTHROPIC_API_KEY (sync:false), API_KEY_HASH_PEPPER (generateValue), NODE_ENV, LOG_LEVEL, BULLMQ_CONCURRENCY, CORS_ORIGINS (sync:false), CONFIDENCE_THRESHOLD, SLACK_BOT_TOKEN (sync:false), SLACK_SIGNING_SECRET (sync:false)",
+        "Each service has correct rootDir, buildCommand, startCommand, envVars referencing database/redis/secrets",
+        "Static site has SPA rewrite rule (/* -> /index.html) and cache headers for /assets/*",
+        "Typecheck passes"
+      ],
+      "priority": 45,
+      "passes": false,
+      "notes": "This must be the last story since it references all services built in prior stories."
+    }
+  ]
+}
