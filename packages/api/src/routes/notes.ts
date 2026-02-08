@@ -10,6 +10,7 @@ import { rawNotes } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
 import { decodeCursor, encodeCursor, parseLimit, parseOptionalBoolean } from "../lib/pagination.js";
 import { captureNote, markNoteForReprocess } from "../services/capture.js";
+import { tier2ApiKeyCaptureLimiter } from "../middleware/rate-limit.js";
 
 const noteIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -28,6 +29,7 @@ const listNotesQuerySchema = z.object({
 type NotesCursor = { capturedAt: string; id: string };
 
 export const noteRoutes = new Hono<AppEnv>()
+  .use("/capture", tier2ApiKeyCaptureLimiter)
   .post(
     "/capture",
     zValidator("json", captureNoteSchema, (result) => {
