@@ -28,7 +28,6 @@ services:
     name: pm-web
     runtime: static
     plan: free
-    region: oregon
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/web build"
     staticPublishPath: ./packages/web/dist
     buildFilter:
