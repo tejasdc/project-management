@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.9",
     "@pm/shared": "workspace:*",
     "hono": "^4.7.0"
   },
