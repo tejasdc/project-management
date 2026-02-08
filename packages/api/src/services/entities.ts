@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, or } from "drizzle-orm";
 
 import { ENTITY_STATUSES } from "@pm/shared";
 import { db } from "../db/index.js";
@@ -130,17 +130,23 @@ export async function addEntityComment(opts: { entityId: string; actorUserId: st
   return event!;
 }
 
-export async function listEntityEvents(opts: { entityId: string; limit: number; cursor?: string }) {
+export async function listEntityEvents(opts: { entityId: string; limit: number; cursor?: string; order?: "asc" | "desc" }) {
   const cursor = opts.cursor ? decodeCursor<EntityCursor>(opts.cursor) : null;
+  const order = opts.order ?? "desc";
   const where: any[] = [eq(entityEvents.entityId, opts.entityId)];
 
   if (cursor) {
     const t = new Date(cursor.createdAt);
     where.push(
-      or(
-        lt(entityEvents.createdAt, t),
-        and(eq(entityEvents.createdAt, t), lt(entityEvents.id, cursor.id))
-      )
+      order === "asc"
+        ? or(
+            gt(entityEvents.createdAt, t),
+            and(eq(entityEvents.createdAt, t), gt(entityEvents.id, cursor.id))
+          )
+        : or(
+            lt(entityEvents.createdAt, t),
+            and(eq(entityEvents.createdAt, t), lt(entityEvents.id, cursor.id))
+          )
     );
   }
 
@@ -148,7 +154,10 @@ export async function listEntityEvents(opts: { entityId: string; limit: number; 
     .select()
     .from(entityEvents)
     .where(and(...where))
-    .orderBy(desc(entityEvents.createdAt), desc(entityEvents.id))
+    .orderBy(
+      order === "asc" ? asc(entityEvents.createdAt) : desc(entityEvents.createdAt),
+      order === "asc" ? asc(entityEvents.id) : desc(entityEvents.id)
+    )
     .limit(opts.limit + 1);
 
   const items = rows.slice(0, opts.limit);

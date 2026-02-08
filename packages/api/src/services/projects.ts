@@ -7,9 +7,12 @@ import { decodeCursor, encodeCursor } from "../lib/pagination.js";
 
 type ProjectCursor = { updatedAt: string; id: string };
 
-export async function listProjects(opts?: { status?: "active" | "archived"; includeDeleted?: boolean; limit?: number; cursor?: string | null }) {
+export async function listProjects(opts?: { status?: "active" | "archived" | "all"; includeDeleted?: boolean; limit?: number; cursor?: string | null }) {
   const where: any[] = [];
-  if (opts?.status) where.push(eq(projects.status, opts.status));
+
+  // Default behavior: show only active, non-deleted projects unless explicitly requested.
+  const status = opts?.status ?? (opts?.includeDeleted ? "all" : "active");
+  if (status !== "all") where.push(eq(projects.status, status));
   if (!opts?.includeDeleted) where.push(isNull(projects.deletedAt));
 
   const cursor = opts?.cursor ? decodeCursor<ProjectCursor>(opts.cursor) : null;

@@ -48,7 +48,7 @@ export const reviewQueue = pgTable(
     // Prevent duplicate pending reviews for the same entity + review type
     uniqueIndex("review_queue_pending_unique_entity_review_type")
       .on(table.entityId, table.reviewType)
-      .where(sql`status = 'pending' AND entity_id IS NOT NULL AND review_type <> 'low_confidence'`),
+      .where(sql`status = 'pending' AND entity_id IS NOT NULL`),
     // At least one of entity_id or project_id must be set
     check(
       "review_queue_entity_or_project",

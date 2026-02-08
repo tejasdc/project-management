@@ -10,13 +10,8 @@ import type { NoteSource } from "@pm/shared";
 import chalk from "chalk";
 import Table from "cli-table3";
 
-type Config = {
-  apiUrl: string;
-  apiKey: string;
-};
-
-const CONFIG_DIR = path.join(os.homedir(), ".pm");
-const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
+import type { Config } from "./config.js";
+import { getDefaultConfigPath, readConfig as readConfigFile, writeConfig as writeConfigFile } from "./config.js";
 
 const red = (s: string) => chalk.red(s);
 const green = (s: string) => chalk.green(s);
@@ -89,19 +84,7 @@ function toInlineCell(value: unknown, max = 60) {
 }
 
 async function readConfig(): Promise<Config | null> {
-  try {
-    const raw = await fs.readFile(CONFIG_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<Config>;
-    if (!parsed.apiUrl || !parsed.apiKey) return null;
-    return { apiUrl: parsed.apiUrl, apiKey: parsed.apiKey };
-  } catch {
-    return null;
-  }
-}
-
-async function writeConfig(cfg: Config) {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+  return readConfigFile();
 }
 
 async function requireConfig() {
@@ -162,7 +145,7 @@ program
         return;
       }
       const t = tableForTerminal({ head: ["Key", "Value"] });
-      t.push(["Config path", dim(CONFIG_PATH)]);
+      t.push(["Config path", dim(getDefaultConfigPath())]);
       t.push(["API URL", current.apiUrl]);
       t.push(["API key", dim(maskKey(current.apiKey))]);
       console.log(t.toString());
@@ -173,9 +156,9 @@ program
     const apiKey = opts.key ?? current?.apiKey;
     if (!apiUrl || !apiKey) throw new Error("Provide --url and --key (or use --show).");
 
-    await writeConfig({ apiUrl, apiKey });
+    await writeConfigFile({ apiUrl, apiKey });
     const t = tableForTerminal({ head: ["Result", "Value"] });
-    t.push([green("Saved"), dim(CONFIG_PATH)]);
+    t.push([green("Saved"), dim(getDefaultConfigPath())]);
     t.push(["API URL", apiUrl]);
     t.push(["API key", dim(maskKey(apiKey))]);
     console.log(t.toString());

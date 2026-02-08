@@ -43,7 +43,10 @@ export function EntityDetailPage() {
   const events = useQuery({
     queryKey: qk.entityEvents(entityId),
     queryFn: async () => {
-      const res = await api.api.entities[":id"].events.$get({ param: { id: entityId } as any, query: { limit: "50" } as any });
+      const res = await api.api.entities[":id"].events.$get({
+        param: { id: entityId } as any,
+        query: { limit: "50", order: "asc" } as any,
+      });
       return unwrapJson<{ items: any[] }>(res);
     },
   });
@@ -120,6 +123,14 @@ export function EntityDetailPage() {
   const assignee = (usersQ.data?.items ?? []).find((u: any) => u.id === e.assigneeId) ?? null;
 
   const allowedStatuses = ((ENTITY_STATUSES as any)[e.type] ?? []) as string[];
+  const timelineItems = (events.data?.items ?? [])
+    .slice()
+    .sort((a: any, b: any) => {
+      const ta = new Date(a.createdAt).getTime();
+      const tb = new Date(b.createdAt).getTime();
+      if (ta !== tb) return ta - tb;
+      return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+    });
 
   return (
     <div>
@@ -214,6 +225,10 @@ export function EntityDetailPage() {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">Rationale</div>
                   <div className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-primary)]">{e.attributes?.rationale ?? "—"}</div>
                 </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">Decided by</div>
+                  <div className="mt-2 text-sm text-[var(--text-primary)]">{e.attributes?.decidedBy ?? "—"}</div>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -307,10 +322,10 @@ export function EntityDetailPage() {
                   Retry
                 </button>
               </div>
-            ) : (events.data?.items ?? []).length === 0 ? (
+            ) : timelineItems.length === 0 ? (
               <div className="text-sm text-[var(--text-secondary)]">No events yet.</div>
             ) : (
-              (events.data?.items ?? []).map((ev: any) => (
+              timelineItems.map((ev: any) => (
                 <div key={ev.id} className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-sm font-semibold">{ev.type}</div>

@@ -13,7 +13,7 @@ const projectIdParamsSchema = z.object({
 });
 
 const listProjectsQuerySchema = z.object({
-  status: z.enum(["active", "archived"]).optional(),
+  status: z.enum(["active", "archived", "all"]).optional(),
   includeDeleted: z.string().optional(),
   limit: z.string().optional(),
   cursor: z.string().optional(),

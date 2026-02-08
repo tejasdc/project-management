@@ -44,6 +44,7 @@ const entityPatchSchema = z.object({
 const listEventsQuerySchema = z.object({
   limit: z.string().optional(),
   cursor: z.string().optional(),
+  order: z.enum(["asc", "desc"]).optional(),
 });
 
 const addCommentSchema = z.object({
@@ -135,7 +136,7 @@ export const entityRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid("param");
       const q = c.req.valid("query");
       const limit = parseLimit(q.limit);
-      const res = await listEntityEvents({ entityId: id, limit, cursor: q.cursor });
+      const res = await listEntityEvents({ entityId: id, limit, cursor: q.cursor, order: q.order });
       return c.json(res);
     }
   )
