@@ -96,11 +96,12 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
       const reviewTypeOrder = sql<number>`
         case ${reviewQueue.reviewType}
           when 'type_classification' then 1
-          when 'project_assignment' then 2
-          when 'epic_assignment' then 3
-          when 'assignee_suggestion' then 4
-          when 'duplicate_detection' then 5
-          when 'epic_creation' then 10
+          when 'project_creation' then 2
+          when 'project_assignment' then 3
+          when 'epic_creation' then 4
+          when 'epic_assignment' then 5
+          when 'assignee_suggestion' then 6
+          when 'duplicate_detection' then 7
           else 50
         end
       `;
@@ -170,6 +171,7 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         if (ent?.projectId) await tryPublishEvent("project:stats_updated", { projectId: ent.projectId });
       }
       if (res.item.projectId) await tryPublishEvent("project:stats_updated", { projectId: res.item.projectId });
+      if (res.effects.createdProjectId) await tryPublishEvent("project:stats_updated", { projectId: res.effects.createdProjectId });
 
       return c.json(res);
     }

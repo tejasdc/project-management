@@ -76,6 +76,8 @@ export const reviewResolveSchema = z.object({
       proposedEpicName: z.string().optional(),
       proposedEpicDescription: z.string().nullable().optional(),
       proposedEpicProjectId: z.string().optional(),
+      proposedProjectName: z.string().optional(),
+      proposedProjectDescription: z.string().nullable().optional(),
       duplicateEntityId: z.string().optional(),
       similarityScore: z.number().optional(),
       suggestedAssigneeId: z.string().optional(),

@@ -167,6 +167,8 @@ export interface ReviewSuggestion {
   proposedEpicName?: string;
   proposedEpicDescription?: string | null;
   proposedEpicProjectId?: string;
+  proposedProjectName?: string;
+  proposedProjectDescription?: string | null;
   candidateEntityIds?: string[];
   duplicateEntityId?: string;
   similarityScore?: number;

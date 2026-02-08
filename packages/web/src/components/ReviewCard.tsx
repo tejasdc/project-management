@@ -27,6 +27,8 @@ export function ReviewCard(props: {
   const [altDuplicateId, setAltDuplicateId] = useState("");
   const [altEpicName, setAltEpicName] = useState("");
   const [altEpicDescription, setAltEpicDescription] = useState("");
+  const [altProjectName, setAltProjectName] = useState(props.item.aiSuggestion?.proposedProjectName ?? "");
+  const [altProjectDescription, setAltProjectDescription] = useState(props.item.aiSuggestion?.proposedProjectDescription ?? "");
   const [altJson, setAltJson] = useState("");
 
   return (
@@ -136,6 +138,17 @@ export function ReviewCard(props: {
                   </>
                 ) : null}
 
+                {props.item.reviewType === "project_creation" ? (
+                  <>
+                    <Input value={altProjectName} onChange={(e) => setAltProjectName(e.target.value)} placeholder="Project name" />
+                    <Input
+                      value={altProjectDescription}
+                      onChange={(e) => setAltProjectDescription(e.target.value)}
+                      placeholder="Project description (optional)"
+                    />
+                  </>
+                ) : null}
+
                 {props.item.reviewType === "low_confidence" ? (
                   <textarea
                     value={altJson}
@@ -160,6 +173,8 @@ export function ReviewCard(props: {
                     else if (props.item.reviewType === "duplicate_detection") userResolution = { duplicateEntityId: altDuplicateId.trim() };
                     else if (props.item.reviewType === "epic_creation")
                       userResolution = { proposedEpicName: altEpicName.trim(), proposedEpicDescription: altEpicDescription.trim() || null };
+                    else if (props.item.reviewType === "project_creation")
+                      userResolution = { proposedProjectName: altProjectName.trim(), proposedProjectDescription: altProjectDescription.trim() || null };
                     else if (props.item.reviewType === "low_confidence") {
                       if (altJson.trim()) {
                         try {

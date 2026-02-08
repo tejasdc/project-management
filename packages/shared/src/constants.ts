@@ -27,6 +27,7 @@ export const REVIEW_TYPES = [
   "project_assignment",
   "epic_assignment",
   "epic_creation",
+  "project_creation",
   "duplicate_detection",
   "low_confidence",
   "assignee_suggestion",

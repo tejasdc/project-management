@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { ReviewSuggestion } from "@pm/shared";
 import { ENTITY_STATUSES } from "@pm/shared";
 import { db } from "../db/index.js";
-import { entities, entityEvents, entityRelationships, epics, reviewQueue } from "../db/schema/index.js";
+import { entities, entityEvents, entityRelationships, epics, projects, reviewQueue } from "../db/schema/index.js";
 import { entityWithAttributesSchema } from "../db/validation.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 
@@ -12,6 +12,7 @@ type ReviewStatus = "accepted" | "rejected" | "modified";
 export type ResolveEffects = {
   updatedEntityIds: string[];
   createdEpicId?: string;
+  createdProjectId?: string;
   createdRelationshipId?: string;
   autoResolvedReviewIds: string[];
 };
@@ -272,6 +273,54 @@ async function resolveReviewItemTx(
               reviewType: "epic_assignment",
               status: "pending",
               aiSuggestion: { suggestedEpicId: epic.id, explanation: `Assign to newly created epic '${name}'` } as any,
+              aiConfidence: existing.aiConfidence,
+            })
+            .onConflictDoNothing();
+        }
+      }
+    }
+  }
+
+  if (existing.reviewType === "project_creation") {
+    if (opts.status !== "rejected") {
+      const name = suggestion?.proposedProjectName;
+      const description = suggestion?.proposedProjectDescription ?? null;
+      if (!name) throw badRequest("Missing proposedProjectName");
+
+      const [project] = await tx
+        .insert(projects)
+        .values({ name, description })
+        .returning({ id: projects.id });
+
+      effects.createdProjectId = project?.id;
+
+      // Create follow-up project_assignment review items for candidate entities
+      const candidateEntityIds = (suggestion as any)?.candidateEntityIds as unknown;
+      if (project?.id && Array.isArray(candidateEntityIds) && candidateEntityIds.length > 0) {
+        const uniqueIds = Array.from(new Set(candidateEntityIds))
+          .filter((id) => typeof id === "string" && id.length > 0);
+        for (const entityId of uniqueIds) {
+          const ent = await tx.query.entities.findFirst({
+            where: (t: any, q: any) => eq(t.id, entityId),
+          });
+          if (!ent) continue;
+
+          // Remove any stale pending project_assignment for this entity
+          await tx.delete(reviewQueue).where(
+            and(eq(reviewQueue.entityId, entityId), eq(reviewQueue.reviewType, "project_assignment"), eq(reviewQueue.status, "pending"))
+          );
+
+          await tx
+            .insert(reviewQueue)
+            .values({
+              entityId,
+              projectId: project.id,
+              reviewType: "project_assignment",
+              status: "pending",
+              aiSuggestion: {
+                suggestedProjectId: project.id,
+                explanation: `Assign to newly created project '${name}'`,
+              } as any,
               aiConfidence: existing.aiConfidence,
             })
             .onConflictDoNothing();

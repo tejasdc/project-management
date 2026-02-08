@@ -141,7 +141,8 @@ Expected Output:
       "assigneeReason": null
     }
   ],
-  "epicSuggestions": []
+  "epicSuggestions": [],
+  "projectSuggestions": []
 }
 \`\`\`
 `.trim();
@@ -168,6 +169,13 @@ For each extracted entity, determine:
    - projectId, name, description
    - entityIndices (0-based indices into the extractedEntities array)
    - confidence (0.0-1.0) and reason
+6. Project suggestions (optional): if entities describe a new initiative, product, or work area
+   that doesn't match ANY existing project, suggest creating a project:
+   - name, description
+   - entityIndices (0-based indices into the extractedEntities array)
+   - confidence (0.0-1.0) and reason
+   Only suggest when you are confident these entities represent a genuinely distinct project,
+   not just a new epic within an existing project.
 
 ## Confidence
 

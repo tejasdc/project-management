@@ -273,6 +273,35 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
           .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
         if (row) createdReviewItems.push(row);
       }
+
+      // Project creation suggestions — entity-scoped review items.
+      for (const s of org.result.projectSuggestions) {
+        const candidateEntityIds = (s.entityIndices ?? [])
+          .map((idx) => entityIds[idx])
+          .filter(Boolean);
+
+        // Use the first candidate entity to satisfy the entity_or_project CHECK constraint
+        const anchorEntityId = candidateEntityIds[0] ?? null;
+        if (!anchorEntityId) continue;
+
+        const [row] = await tx
+          .insert(reviewQueue)
+          .values({
+            entityId: anchorEntityId,
+            reviewType: "project_creation",
+            status: "pending",
+            aiSuggestion: {
+              proposedProjectName: s.name,
+              proposedProjectDescription: s.description,
+              candidateEntityIds,
+              explanation: s.reason,
+            } as any,
+            aiConfidence: s.confidence ?? 0.85,
+          })
+          .onConflictDoNothing()
+          .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+        if (row) createdReviewItems.push(row);
+      }
     });
 
     // Emit SSE events after commit.

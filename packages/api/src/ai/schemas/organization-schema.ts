@@ -33,9 +33,18 @@ const epicSuggestionSchema = z.object({
   reason: z.string(),
 });
 
+const projectSuggestionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  entityIndices: z.array(z.number().int().nonnegative()).default([]),
+  confidence: z.number().min(0).max(1).default(0.85),
+  reason: z.string(),
+});
+
 export const organizationResultSchema = z.object({
   entityOrganizations: z.array(entityOrganizationSchema).default([]),
   epicSuggestions: z.array(epicSuggestionSchema).default([]),
+  projectSuggestions: z.array(projectSuggestionSchema).default([]),
 });
 
 export type OrganizationResult = z.infer<typeof organizationResultSchema>;
