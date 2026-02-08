@@ -6,8 +6,8 @@ services:
     plan: free
     region: oregon
     buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/api build"
-    startCommand: "node packages/api/dist/index.js"
-    healthCheckPath: /health
+    startCommand: "node packages/api/dist/server.js"
+    healthCheckPath: /api/health
     buildFilter:
       paths:
         - "packages/api/**"

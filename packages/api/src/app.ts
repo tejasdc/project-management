@@ -193,15 +193,17 @@ export function createApp() {
   // Public routes
   const withHealth = base.get("/api/health", async (c) => {
     const [dbRes, redisRes] = await Promise.all([checkDb(), checkRedis()]);
-    const ok = dbRes.status === "ok" && redisRes.status === "ok";
+    const dbOk = dbRes.status === "ok";
+    const redisOk = redisRes.status === "ok";
+    const status = dbOk && redisOk ? "ok" : dbOk ? "degraded" : "unhealthy";
 
-    if (!ok) return c.json({ status: "degraded" }, 503);
+    // Return 200 for ok/degraded (API works without Redis), 503 only if DB is down.
+    const httpStatus = dbOk ? 200 : 503;
 
-    return c.json({
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      checks: { db: dbRes, redis: redisRes },
-    });
+    return c.json(
+      { status, timestamp: new Date().toISOString(), checks: { db: dbRes, redis: redisRes } },
+      httpStatus
+    );
   });
 
   // Auth middleware applied to all other API routes.
