@@ -20,7 +20,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const auth = authHeader || (sseApiKey ? `Bearer ${sseApiKey}` : "");
   if (!auth) throw unauthorized("Missing Authorization header");
 
-  const m = auth.match(/^Bearer\\s+(.+)$/i);
+  const m = auth.match(/^Bearer\s+(.+)$/i);
   if (!m) throw unauthorized("Invalid Authorization header format");
 
   const plaintextKey = m[1]!.trim();
