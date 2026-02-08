@@ -222,6 +222,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
               aiSuggestion: { fieldKey, suggestedValue, explanation: fc.reason } as any,
               aiConfidence: fc.confidence,
             })
+            .onConflictDoNothing()
             .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
           if (row) createdReviewItems.push(row);
         }
@@ -236,6 +237,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
               aiSuggestion: { explanation: "Low overall extraction confidence" } as any,
               aiConfidence: ent.confidence,
             })
+            .onConflictDoNothing()
             .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
           if (row) createdReviewItems.push(row);
         }
