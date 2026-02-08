@@ -195,14 +195,13 @@ export function createApp() {
     const [dbRes, redisRes] = await Promise.all([checkDb(), checkRedis()]);
     const ok = dbRes.status === "ok" && redisRes.status === "ok";
 
-    return c.json(
-      {
-        status: ok ? "ok" : "degraded",
-        timestamp: new Date().toISOString(),
-        checks: { db: dbRes, redis: redisRes },
-      },
-      ok ? 200 : 503
-    );
+    if (!ok) return c.json({ status: "degraded" }, 503);
+
+    return c.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      checks: { db: dbRes, redis: redisRes },
+    });
   });
 
   // Auth middleware applied to all other API routes.

@@ -13,7 +13,7 @@ import {
   reviewQueue,
   tags,
 } from "../db/schema/index.js";
-import { logger } from "../lib/logger.js";
+import { createJobLogger } from "../lib/logger.js";
 import { extractEntities } from "../ai/extraction.js";
 import { tryPublishEvent } from "../services/events.js";
 import { DEFAULT_JOB_OPTS, entitiesOrganizeQueue, type NotesExtractJob } from "./queue.js";
@@ -38,6 +38,7 @@ function isDeterministicZodError(err: unknown) {
 }
 
 export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
+  const log = createJobLogger(job);
   const { rawNoteId } = job.data;
 
   const note = await db.query.rawNotes.findFirst({
@@ -270,7 +271,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err, rawNoteId, jobId: job.id }, "notes:extract failed");
+    log.error({ err, rawNoteId }, "notes:extract failed");
 
     await db
       .update(rawNotes)

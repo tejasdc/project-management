@@ -1,11 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 
 import { api, unwrapJson } from "../lib/api-client";
 import { qk } from "../lib/query-keys";
 import { EntityRow } from "../components/EntityRow";
 import { Input } from "../components/ui/Input";
 import { Badge } from "../components/ui/Badge";
+import { RouteError } from "./__root";
+
+const createAnyFileRoute = createFileRoute as any;
+
+export const Route = createAnyFileRoute("/projects/$projectId")({
+  component: ProjectDashboardPage,
+  errorComponent: RouteError,
+});
 
 function StatCard(props: { label: string; value: string | number; tone?: "task" | "decision" | "insight" }) {
   const tone =
@@ -88,7 +96,13 @@ export function ProjectDashboardPage() {
   if (dash.isError) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--confidence-low)_28%,var(--border-subtle))] bg-[var(--bg-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-        {(dash.error as any)?.message ?? "Failed to load dashboard."}
+        <div>{(dash.error as any)?.message ?? "Failed to load dashboard."}</div>
+        <button
+          onClick={() => dash.refetch()}
+          className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -296,7 +310,13 @@ export function ProjectDashboardPage() {
           <div className="mt-4 text-sm text-[var(--text-secondary)]">Loading…</div>
         ) : entitiesQ.isError ? (
           <div className="mt-4 text-sm text-[var(--text-secondary)]">
-            {(entitiesQ.error as any)?.message ?? "Failed to load entities."}
+            <div>{(entitiesQ.error as any)?.message ?? "Failed to load entities."}</div>
+            <button
+              onClick={() => entitiesQ.refetch()}
+              className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           (() => {

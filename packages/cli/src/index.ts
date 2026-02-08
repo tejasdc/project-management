@@ -5,7 +5,6 @@ import path from "node:path";
 import process from "node:process";
 import { execSync } from "node:child_process";
 import readline from "node:readline/promises";
-import { createHash } from "node:crypto";
 
 import type { NoteSource } from "@pm/shared";
 import chalk from "chalk";
@@ -23,6 +22,7 @@ const red = (s: string) => chalk.red(s);
 const green = (s: string) => chalk.green(s);
 const dim = (s: string) => chalk.dim(s);
 const yellow = (s: string) => chalk.yellow(s);
+const cyan = (s: string) => chalk.cyan(s);
 
 function formatConfidence(value: unknown) {
   const n = typeof value === "number" ? value : Number(value);
@@ -36,6 +36,56 @@ function shortId(id: unknown) {
   if (!id) return "";
   const s = String(id);
   return s.length > 8 ? s.slice(0, 8) : s;
+}
+
+function maskKey(key: string) {
+  const s = String(key);
+  if (s.length <= 8) return "********";
+  return `${"*".repeat(Math.min(12, s.length - 4))}${s.slice(-4)}`;
+}
+
+function normalizeRelPath(p: string) {
+  // Keep externalId stable across OS path separators.
+  return p.split(path.sep).join("/");
+}
+
+function tableForTerminal(opts?: { head?: string[]; colWidths?: number[]; wordWrap?: boolean }) {
+  return new Table({
+    head: opts?.head?.map((h) => chalk.bold(h)),
+    colWidths: opts?.colWidths,
+    wordWrap: opts?.wordWrap,
+    style: { head: [], border: [] },
+  });
+}
+
+function printMessage(message: string, kind: "info" | "success" | "warn" = "info") {
+  const label =
+    kind === "success" ? green("OK") : kind === "warn" ? yellow("WARN") : cyan("INFO");
+  const t = tableForTerminal({ head: ["", ""] });
+  t.push([label, message]);
+  console.log(t.toString());
+}
+
+function toCell(value: unknown) {
+  if (value === null || value === undefined) return dim("n/a");
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function truncateAscii(s: string, max: number) {
+  if (s.length <= max) return s;
+  if (max <= 3) return s.slice(0, max);
+  return `${s.slice(0, max - 3)}...`;
+}
+
+function toInlineCell(value: unknown, max = 60) {
+  const s = toCell(value).replace(/\s+/g, " ").trim();
+  return truncateAscii(s, max);
 }
 
 async function readConfig(): Promise<Config | null> {
@@ -108,10 +158,14 @@ program
     const current = await readConfig();
     if (opts.show) {
       if (!current) {
-        console.log(dim("No config found."));
+        printMessage("No config found.", "warn");
         return;
       }
-      console.log(JSON.stringify({ apiUrl: current.apiUrl, apiKey: "********" }, null, 2));
+      const t = tableForTerminal({ head: ["Key", "Value"] });
+      t.push(["Config path", dim(CONFIG_PATH)]);
+      t.push(["API URL", current.apiUrl]);
+      t.push(["API key", dim(maskKey(current.apiKey))]);
+      console.log(t.toString());
       return;
     }
 
@@ -120,7 +174,11 @@ program
     if (!apiUrl || !apiKey) throw new Error("Provide --url and --key (or use --show).");
 
     await writeConfig({ apiUrl, apiKey });
-    console.log(green("Config saved."));
+    const t = tableForTerminal({ head: ["Result", "Value"] });
+    t.push([green("Saved"), dim(CONFIG_PATH)]);
+    t.push(["API URL", apiUrl]);
+    t.push(["API key", dim(maskKey(apiKey))]);
+    console.log(t.toString());
   });
 
 program
@@ -143,20 +201,21 @@ program
 
     const noteId = res?.note?.id;
     const deduped = Boolean(res?.deduped);
-    console.log(`${green("Captured")} ${dim(shortId(noteId))} ${deduped ? dim("(deduped)") : ""}`.trim());
+    const t = tableForTerminal({ head: ["Field", "Value"] });
+    t.push(["Result", green("Captured")]);
+    t.push(["Note", dim(shortId(noteId))]);
+    t.push(["Deduped", deduped ? yellow("true") : green("false")]);
+    console.log(t.toString());
   });
 
 program
   .command("projects")
   .description("List projects")
   .action(async () => {
-    const res = await apiFetch({ path: "/api/projects" });
-    const table = new Table({
-      head: [chalk.bold("Name"), chalk.bold("Status"), chalk.bold("Id")],
-      style: { head: [], border: [] },
-    });
+    const res = await apiFetch({ path: "/api/projects?status=active" });
+    const table = tableForTerminal({ head: ["Name", "Id"] });
     for (const p of res.items ?? []) {
-      table.push([p.name, p.status, dim(shortId(p.id))]);
+      table.push([p.name, dim(shortId(p.id))]);
     }
     console.log(table.toString());
   });
@@ -174,14 +233,11 @@ program
     if (opts.status) params.set("status", opts.status);
     if (opts.assignee) params.set("assigneeId", opts.assignee);
     const res = await apiFetch({ path: `/api/entities?${params.toString()}` });
-    const table = new Table({
-      head: [chalk.bold("Status"), chalk.bold("Content"), chalk.bold("Id")],
-      colWidths: [14, 70, 12],
-      wordWrap: true,
-      style: { head: [], border: [] },
-    });
+    const table = tableForTerminal({ head: ["Status", "Content", "Id"], colWidths: [14, 70, 12], wordWrap: true });
     for (const t of res.items ?? []) {
-      table.push([t.status, t.content, dim(shortId(t.id))]);
+      const status = String(t.status ?? "");
+      const coloredStatus = status === "done" ? green(status) : status === "in_progress" ? yellow(status) : status;
+      table.push([coloredStatus, t.content, dim(shortId(t.id))]);
     }
     console.log(table.toString());
   });
@@ -197,7 +253,11 @@ program
       method: "POST",
       body: { newStatus },
     });
-    console.log(`${green("Updated")} ${dim(shortId(res?.entity?.id ?? entityId))} -> ${chalk.bold(res?.entity?.status ?? newStatus)}`);
+    const t = tableForTerminal({ head: ["Field", "Value"] });
+    t.push(["Result", green("Updated")]);
+    t.push(["Entity", dim(shortId(res?.entity?.id ?? entityId))]);
+    t.push(["Status", chalk.bold(res?.entity?.status ?? newStatus)]);
+    console.log(t.toString());
   });
 
 program
@@ -213,10 +273,11 @@ program
     let newCount = 0;
     let skippedCount = 0;
     let total = 0;
+    let considered = 0;
 
     const files: string[] = [];
     async function walk(dir: string) {
-      let entries: any[];
+      let entries: import("node:fs").Dirent[];
       try {
         entries = await fs.readdir(dir, { withFileTypes: true });
       } catch {
@@ -235,17 +296,31 @@ program
     await walk(baseDir);
     files.sort();
 
+    const displayed: Array<[string, string, string]> = [];
+    const DISPLAY_LIMIT = 25;
+
     for (const filePath of files) {
       const stat = await fs.stat(filePath);
       if (!stat.isFile()) continue;
       if (since && stat.mtime < since) continue;
 
-      total += 1;
       const rel = path.relative(baseDir, filePath);
-      const externalId = createHash("sha256").update(`${filePath}:${stat.mtimeMs}`).digest("hex");
+      const relNorm = normalizeRelPath(rel);
+
+      // Heuristic: Claude Code stores sessions under per-project folders, typically in a sessions/ subtree.
+      // Only sync likely session artifacts to avoid uploading unrelated project metadata.
+      const baseName = relNorm.split("/").pop() ?? relNorm;
+      const isLikelySession =
+        relNorm.endsWith(".jsonl") ||
+        (relNorm.endsWith(".json") && (relNorm.includes("/sessions/") || baseName.includes("session")));
+      if (!isLikelySession) continue;
+
+      considered += 1;
+      const externalId = `claude_code_session:${relNorm}`;
 
       if (opts.dryRun) {
-        console.log(`${dim("DRY")} ${rel}`);
+        total += 1;
+        if (displayed.length < DISPLAY_LIMIT) displayed.push([relNorm, dim("dry-run"), dim("-")]);
         continue;
       }
 
@@ -254,27 +329,43 @@ program
         path: "/api/notes/capture",
         method: "POST",
         body: {
-          content,
+          content: `Claude Code session: ${relNorm}\n\n${content}`,
           source: "cli" satisfies NoteSource,
           externalId,
           capturedAt: stat.mtime.toISOString(),
           sourceMeta: {
-            kind: "claude_session",
-            sessionPath: rel,
-            absolutePath: filePath,
+            kind: "claude_code_session",
+            sessionPath: relNorm,
             mtimeMs: stat.mtimeMs,
             sizeBytes: stat.size,
           },
         },
       });
 
-      if (res?.deduped) skippedCount += 1;
-      else newCount += 1;
-      process.stdout.write(".");
+      total += 1;
+      const noteId = res?.note?.id ? shortId(res.note.id) : "-";
+      if (res?.deduped) {
+        skippedCount += 1;
+        if (displayed.length < DISPLAY_LIMIT) displayed.push([relNorm, dim("skipped (deduped)"), dim(noteId)]);
+      } else {
+        newCount += 1;
+        if (displayed.length < DISPLAY_LIMIT) displayed.push([relNorm, green("uploaded"), dim(noteId)]);
+      }
     }
 
-    if (!opts.dryRun && total > 0) process.stdout.write("\n");
-    console.log(`${green("session-sync")} ${newCount} new, ${skippedCount} skipped (${total} scanned)`);
+    const itemsTable = tableForTerminal({ head: ["Session", "Outcome", "Note"] , colWidths: [60, 18, 10], wordWrap: true });
+    for (const row of displayed) itemsTable.push(row);
+    if (considered > DISPLAY_LIMIT) itemsTable.push([dim(`... (${considered - DISPLAY_LIMIT} more)`), dim(""), dim("")]);
+    console.log(itemsTable.toString());
+
+    const summary = tableForTerminal({ head: ["Metric", "Value"] });
+    summary.push(["Considered", String(considered)]);
+    summary.push(["Uploaded (new)", green(String(newCount))]);
+    summary.push(["Skipped (deduped)", yellow(String(skippedCount))]);
+    summary.push(["Uploaded/Skipped", String(total)]);
+    if (since) summary.push(["Since", since.toISOString()]);
+    if (opts.dryRun) summary.push(["Dry run", yellow("true")]);
+    console.log(summary.toString());
   });
 
 program
@@ -286,23 +377,51 @@ program
     const res = await apiFetch({ path: `/api/review-queue?status=pending&limit=${limit}` });
     const items = (res.items ?? []) as any[];
     if (items.length === 0) {
-      console.log(green("No pending review items."));
+      printMessage("No pending review items.", "success");
       return;
     }
 
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     try {
+      const list = tableForTerminal({
+        head: ["#", "Type", "Confidence", "Entity", "Suggestion", "Review"],
+        colWidths: [4, 22, 12, 10, 48, 10],
+        wordWrap: true,
+      });
+      items.forEach((it, idx) => {
+        list.push([
+          String(idx + 1),
+          chalk.bold(String(it.reviewType ?? "")),
+          formatConfidence(it.aiConfidence),
+          dim(shortId(it.entityId)),
+          dim(toInlineCell(it.aiSuggestion)),
+          dim(shortId(it.id)),
+        ]);
+      });
+      console.log(list.toString());
+
       for (const item of items) {
-        console.log("");
-        console.log(`${chalk.bold(item.reviewType)}  ${dim(item.id)}`);
-        console.log(`confidence: ${formatConfidence(item.aiConfidence)}`);
-        console.log(`suggestion: ${dim(JSON.stringify(item.aiSuggestion))}`);
+        const details = tableForTerminal({ head: ["Field", "Value"], colWidths: [18, 90], wordWrap: true });
+        details.push(["Review", dim(shortId(item.id))]);
+        details.push(["Type", chalk.bold(String(item.reviewType ?? ""))]);
+        details.push(["Confidence", formatConfidence(item.aiConfidence)]);
+        details.push(["Suggestion", dim(toCell(item.aiSuggestion))]);
         if (item.entityId) {
           const ent = await apiFetch({ path: `/api/entities/${item.entityId}` });
-          console.log(`entity: ${ent.entity.content}`);
+          details.push(["Entity", dim(shortId(item.entityId))]);
+          details.push(["Content", String(ent.entity?.content ?? "")]);
+          details.push(["Status", String(ent.entity?.status ?? "")]);
         }
+        console.log(details.toString());
 
-        const action = (await rl.question("Action [a]ccept [r]eject [m]odify [s]kip: ")).trim().toLowerCase();
+        const actions = tableForTerminal({ head: ["Key", "Action"] });
+        actions.push([green("a"), "accept"]);
+        actions.push([red("r"), "reject"]);
+        actions.push([yellow("m"), "modify"]);
+        actions.push([dim("s"), "skip"]);
+        console.log(actions.toString());
+
+        const action = (await rl.question(cyan("Action [a/r/m/s]: "))).trim().toLowerCase();
         if (action === "s" || action === "") continue;
 
         if (action === "a" || action === "r") {
@@ -312,45 +431,59 @@ program
             method: "POST",
             body: { status },
           });
-          console.log(green(`resolved: ${out.item.status}`));
+          const t = tableForTerminal({ head: ["Field", "Value"] });
+          t.push(["Result", green("resolved")]);
+          t.push(["Review", dim(shortId(out.item?.id ?? item.id))]);
+          t.push(["Status", chalk.bold(String(out.item?.status ?? status))]);
+          console.log(t.toString());
           continue;
         }
 
         if (action === "m") {
           const userResolution: Record<string, unknown> = {};
           if (item.reviewType === "type_classification") {
-            const t = (await rl.question("New type (task|decision|insight): ")).trim();
+            const t = (await rl.question(cyan("New type (task|decision|insight): "))).trim();
+            if (!["task", "decision", "insight"].includes(t)) {
+              printMessage("Invalid type; skipping item.", "warn");
+              continue;
+            }
             userResolution.suggestedType = t;
           } else if (item.reviewType === "project_assignment") {
-            const pid = (await rl.question("Project ID (blank to clear): ")).trim();
+            const pid = (await rl.question(cyan("Project ID (blank to skip): "))).trim();
             if (pid) userResolution.suggestedProjectId = pid;
           } else if (item.reviewType === "epic_assignment") {
-            const eid = (await rl.question("Epic ID (blank to clear): ")).trim();
+            const eid = (await rl.question(cyan("Epic ID (blank to skip): "))).trim();
             if (eid) userResolution.suggestedEpicId = eid;
           } else if (item.reviewType === "assignee_suggestion") {
-            const aid = (await rl.question("Assignee user ID (blank to clear): ")).trim();
+            const aid = (await rl.question(cyan("Assignee user ID (blank to skip): "))).trim();
             if (aid) userResolution.suggestedAssigneeId = aid;
           } else if (item.reviewType === "duplicate_detection") {
-            const did = (await rl.question("Duplicate entity ID: ")).trim();
+            const did = (await rl.question(cyan("Duplicate entity ID: "))).trim();
             userResolution.duplicateEntityId = did;
           } else if (item.reviewType === "epic_creation") {
-            const name = (await rl.question("Epic name: ")).trim();
-            const desc = (await rl.question("Epic description (optional): ")).trim();
+            const name = (await rl.question(cyan("Epic name: "))).trim();
+            const desc = (await rl.question(cyan("Epic description (optional): "))).trim();
             userResolution.proposedEpicName = name;
             if (desc) userResolution.proposedEpicDescription = desc;
           } else {
-            console.log(dim("Modify not supported for this review type; skipping."));
+            printMessage("Modify not supported for this review type; skipping.", "warn");
             continue;
           }
 
-          const trainingComment = (await rl.question("Training comment (optional): ")).trim();
+          const trainingComment = (await rl.question(cyan("Training comment (optional): "))).trim();
 
           const out = await apiFetch({
             path: `/api/review-queue/${item.id}/resolve`,
             method: "POST",
             body: { status: "modified", userResolution, trainingComment: trainingComment || undefined },
           });
-          console.log(green(`resolved: ${out.item.status}`));
+          const t = tableForTerminal({ head: ["Field", "Value"], colWidths: [18, 90], wordWrap: true });
+          t.push(["Result", green("resolved")]);
+          t.push(["Review", dim(shortId(out.item?.id ?? item.id))]);
+          t.push(["Status", chalk.bold(String(out.item?.status ?? "modified"))]);
+          t.push(["Resolution", dim(toCell(userResolution))]);
+          if (trainingComment) t.push(["Comment", trainingComment]);
+          console.log(t.toString());
         }
       }
     } finally {

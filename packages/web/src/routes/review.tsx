@@ -1,9 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { api, unwrapJson } from "../lib/api-client";
 import { qk } from "../lib/query-keys";
 import { ReviewCard } from "../components/ReviewCard";
+import { RouteError } from "./__root";
+
+const createAnyFileRoute = createFileRoute as any;
+
+export const Route = createAnyFileRoute("/review")({
+  component: ReviewPage,
+  errorComponent: RouteError,
+});
 
 function groupBy<T>(items: T[], key: (t: T) => string) {
   const m = new Map<string, T[]>();
@@ -26,7 +35,7 @@ const REVIEW_ORDER: Record<string, number> = {
   low_confidence: 90,
 };
 
-export function ReviewPage() {
+function ReviewPage() {
   const qc = useQueryClient();
 
   const queue = useQuery({
@@ -99,7 +108,13 @@ export function ReviewPage() {
         <div className="mt-6 text-sm text-[var(--text-secondary)]">Loading…</div>
       ) : queue.isError ? (
         <div className="mt-6 rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--confidence-low)_28%,var(--border-subtle))] bg-[var(--bg-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-          {(queue.error as any)?.message ?? "Failed to load review queue."}
+          <div>{(queue.error as any)?.message ?? "Failed to load review queue."}</div>
+          <button
+            onClick={() => queue.refetch()}
+            className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+          >
+            Retry
+          </button>
         </div>
       ) : items.length === 0 ? (
         <div className="mt-6 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5 text-sm text-[var(--text-secondary)]">
@@ -107,6 +122,17 @@ export function ReviewPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-8">
+          {entityMap.isError ? (
+            <div className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--confidence-low)_28%,var(--border-subtle))] bg-[var(--bg-secondary)] p-4 text-sm text-[var(--text-secondary)]">
+              <div>{(entityMap.error as any)?.message ?? "Failed to load entities for review."}</div>
+              <button
+                onClick={() => entityMap.refetch()}
+                className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
           {Array.from(byProject.entries()).map(([projectId, projectItems], pi) => {
             const byEntity = groupBy(projectItems, (i) => i.entityId ?? "project");
             return (

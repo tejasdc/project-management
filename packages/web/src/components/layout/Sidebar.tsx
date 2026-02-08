@@ -61,6 +61,7 @@ export function Sidebar() {
       <nav className="space-y-1 p-2">
         <NavItem to="/projects" label="Projects" />
         <NavItem to="/review" label="Review queue" badge={badge} />
+        <NavItem to="/settings" label="Settings" />
       </nav>
 
       <div className="px-4 pb-4 pt-3">

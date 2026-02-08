@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { createFileRoute, useParams } from "@tanstack/react-router";
 
 import { api, unwrapJson } from "../lib/api-client";
 import { qk } from "../lib/query-keys";
@@ -7,8 +7,17 @@ import { ConfidenceBadge } from "../components/ConfidenceBadge";
 import { TypeBadge } from "../components/TypeBadge";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { Textarea } from "../components/ui/Textarea";
 import { ENTITY_STATUSES } from "@pm/shared";
 import { useState } from "react";
+import { RouteError } from "./__root";
+
+const createAnyFileRoute = createFileRoute as any;
+
+export const Route = createAnyFileRoute("/entities/$entityId")({
+  component: EntityDetailPage,
+  errorComponent: RouteError,
+});
 
 function JsonBlock(props: { value: unknown }) {
   return (
@@ -94,7 +103,13 @@ export function EntityDetailPage() {
   if (entity.isError) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--confidence-low)_28%,var(--border-subtle))] bg-[var(--bg-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-        {(entity.error as any)?.message ?? "Failed to load entity."}
+        <div>{(entity.error as any)?.message ?? "Failed to load entity."}</div>
+        <button
+          onClick={() => entity.refetch()}
+          className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -284,7 +299,13 @@ export function EntityDetailPage() {
               <div className="text-sm text-[var(--text-secondary)]">Loading events…</div>
             ) : events.isError ? (
               <div className="text-sm text-[var(--text-secondary)]">
-                {(events.error as any)?.message ?? "Failed to load events."}
+                <div>{(events.error as any)?.message ?? "Failed to load events."}</div>
+                <button
+                  onClick={() => events.refetch()}
+                  className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+                >
+                  Retry
+                </button>
               </div>
             ) : (events.data?.items ?? []).length === 0 ? (
               <div className="text-sm text-[var(--text-secondary)]">No events yet.</div>
@@ -310,12 +331,11 @@ export function EntityDetailPage() {
               Add comment
             </div>
             <div className="mt-2">
-              <textarea
+              <Textarea
                 value={comment}
                 onChange={(e2) => setComment(e2.target.value)}
                 rows={3}
                 placeholder="What changed? What did you learn?"
-                className="w-full resize-none rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-medium)]"
               />
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">

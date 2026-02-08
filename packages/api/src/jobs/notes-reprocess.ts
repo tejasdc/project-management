@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../db/index.js";
 import { entityEvents, entitySources, rawNotes } from "../db/schema/index.js";
-import { logger } from "../lib/logger.js";
+import { createJobLogger } from "../lib/logger.js";
 import { DEFAULT_JOB_OPTS, notesExtractQueue, type NotesReprocessJob } from "./queue.js";
 
 export async function notesReprocessProcessor(job: Job<NotesReprocessJob>) {
+  const log = createJobLogger(job);
   const { rawNoteId, requestedByUserId } = job.data;
 
   const note = await db.query.rawNotes.findFirst({
@@ -49,8 +50,7 @@ export async function notesReprocessProcessor(job: Job<NotesReprocessJob>) {
       }
     );
   } catch (err) {
-    logger.error({ err, rawNoteId, jobId: job.id }, "Failed to enqueue notes:extract after reprocess");
+    log.error({ err, rawNoteId }, "Failed to enqueue notes:extract after reprocess");
     throw err;
   }
 }
-

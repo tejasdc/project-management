@@ -1,10 +1,19 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { api, unwrapJson } from "../lib/api-client";
 import { qk } from "../lib/query-keys";
 import { ProjectCard } from "../components/ProjectCard";
+import { RouteError } from "./__root";
 
-export function ProjectsPage() {
+const createAnyFileRoute = createFileRoute as any;
+
+export const Route = createAnyFileRoute("/projects")({
+  component: ProjectsPage,
+  errorComponent: RouteError,
+});
+
+function ProjectsPage() {
   const projects = useQuery({
     queryKey: qk.projects(),
     queryFn: async () => {
@@ -54,7 +63,13 @@ export function ProjectsPage() {
         <div className="mt-6 text-sm text-[var(--text-secondary)]">Loading…</div>
       ) : projects.isError ? (
         <div className="mt-6 rounded-[var(--radius-lg)] border border-[color-mix(in_oklab,var(--confidence-low)_28%,var(--border-subtle))] bg-[var(--bg-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-          {(projects.error as any)?.message ?? "Failed to load projects."}
+          <div>{(projects.error as any)?.message ?? "Failed to load projects."}</div>
+          <button
+            onClick={() => projects.refetch()}
+            className="mt-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

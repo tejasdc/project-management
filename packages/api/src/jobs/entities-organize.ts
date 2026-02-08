@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { CONFIDENCE_THRESHOLD } from "@pm/shared";
 import { db } from "../db/index.js";
 import { entities, entityTags, epics, projects, rawNotes, reviewQueue, tags, users } from "../db/schema/index.js";
-import { logger } from "../lib/logger.js";
+import { createJobLogger } from "../lib/logger.js";
 import { organizeEntities } from "../ai/organization.js";
 import { tryPublishEvent } from "../services/events.js";
 import { DEFAULT_JOB_OPTS, type EntitiesOrganizeJob } from "./queue.js";
@@ -23,6 +23,7 @@ function maxBy<T>(items: T[], score: (t: T) => number) {
 }
 
 export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
+  const log = createJobLogger(job);
   const { rawNoteId, entityIds } = job.data;
   if (!entityIds || entityIds.length === 0) return;
 
@@ -285,7 +286,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
       await tryPublishEvent("project:stats_updated", { projectId });
     }
   } catch (err) {
-    logger.error({ err, rawNoteId, jobId: job.id }, "entities:organize failed");
+    log.error({ err, rawNoteId }, "entities:organize failed");
     throw err;
   }
 }

@@ -395,10 +395,8 @@ export async function extractEntities(opts: {
   const usage = lastResponse?.usage ?? null;
   const tokenUsage = usage
     ? {
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        cacheCreationInputTokens: usage.cache_creation_input_tokens,
-        cacheReadInputTokens: usage.cache_read_input_tokens,
+        input: usage.input_tokens,
+        output: usage.output_tokens,
       }
     : undefined;
 

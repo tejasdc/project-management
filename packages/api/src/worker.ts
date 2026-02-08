@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 
-import { logger } from "./lib/logger.js";
+import { createJobLogger, logger } from "./lib/logger.js";
 import { getRedisConnection } from "./jobs/queue.js";
 import { notesExtractProcessor } from "./jobs/notes-extract.js";
 import { entitiesOrganizeProcessor } from "./jobs/entities-organize.js";
@@ -10,10 +10,11 @@ const connection = getRedisConnection();
 
 function wire(worker: Worker) {
   worker.on("completed", (job) => {
-    logger.info({ jobId: job.id, name: job.name, queue: worker.name }, "job completed");
+    createJobLogger(job).info({ queue: worker.name }, "job completed");
   });
   worker.on("failed", (job, err) => {
-    logger.error({ jobId: job?.id, name: job?.name, queue: worker.name, err }, "job failed");
+    if (job) createJobLogger(job).error({ queue: worker.name, err }, "job failed");
+    else logger.error({ queue: worker.name, err }, "job failed");
   });
   worker.on("error", (err) => {
     logger.error({ err, queue: worker.name }, "worker error");
