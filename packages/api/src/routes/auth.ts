@@ -5,9 +5,14 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
-import { apiKeys } from "../db/schema/index.js";
+import { apiKeys, users } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
 import { generateApiKey } from "../services/auth.js";
+
+const registerSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email().max(255),
+});
 
 const createApiKeySchema = z.object({
   name: z.string().min(1),
@@ -18,6 +23,41 @@ const apiKeyIdParamsSchema = z.object({
 });
 
 export const authRoutes = new Hono<AppEnv>()
+  .post(
+    "/register",
+    zValidator("json", registerSchema, (result) => {
+      if (!result.success) throw result.error;
+    }),
+    async (c) => {
+      const { name, email } = c.req.valid("json");
+
+      // Check if email already taken
+      const existing = await db.query.users.findFirst({
+        where: (t, q) => eq(t.email, email),
+      });
+      if (existing) {
+        return c.json(
+          { error: { code: "CONFLICT", message: "Email already registered", status: 409 } },
+          409
+        );
+      }
+
+      const [user] = await db
+        .insert(users)
+        .values({ name, email })
+        .returning();
+
+      const { plaintextKey, keyHash } = await generateApiKey();
+
+      await db.insert(apiKeys).values({
+        userId: user!.id,
+        name: "default",
+        keyHash,
+      });
+
+      return c.json({ user: { id: user!.id, name: user!.name, email: user!.email }, apiKey: plaintextKey }, 201);
+    }
+  )
   .get("/me", (c) => {
     return c.json({ user: c.get("user") });
   })
