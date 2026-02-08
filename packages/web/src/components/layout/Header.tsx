@@ -74,6 +74,13 @@ export function Header() {
                 Review
               </Link>
               <Link
+                to="/history"
+                className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                activeProps={{ className: "bg-[var(--bg-tertiary)] text-[var(--text-primary)]" }}
+              >
+                History
+              </Link>
+              <Link
                 to="/settings"
                 className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                 activeProps={{ className: "bg-[var(--bg-tertiary)] text-[var(--text-primary)]" }}
