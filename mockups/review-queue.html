@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review Queue | PM Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ========================================
+       CSS Custom Properties
+       ======================================== */
+    :root {
+      --bg-primary: #0C0E14;
+      --bg-secondary: #13161F;
+      --bg-tertiary: #1A1E2A;
+      --bg-quaternary: #232836;
+
+      --border-subtle: #2A2F3E;
+      --border-medium: #3A4055;
+
+      --text-primary: #E8EAF0;
+      --text-secondary: #9BA1B5;
+      --text-tertiary: #6B7189;
+
+      --accent-task: #F59E0B;
+      --accent-decision: #3B82F6;
+      --accent-insight: #10B981;
+
+      --confidence-high: #10B981;
+      --confidence-medium: #F59E0B;
+      --confidence-low: #EF4444;
+
+      --action-accept: #10B981;
+      --action-reject: #EF4444;
+      --action-modify: #8B5CF6;
+
+      --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-xl: 12px;
+
+      --transition-fast: 0.15s ease;
+      --transition-medium: 0.25s ease;
+    }
+
+    /* ========================================
+       Reset & Base
+       ======================================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* ========================================
+       Noise Texture Overlay
+       ======================================== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    /* ========================================
+       Animations
+       ======================================== */
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* ========================================
+       Global Navigation Bar
+       ======================================== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px);
+      background-color: rgba(19, 22, 31, 0.92);
+    }
+
+    .navbar-logo {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      letter-spacing: -0.03em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .navbar-logo .logo-mark {
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(135deg, var(--accent-decision), var(--accent-insight));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: white;
+    }
+
+    .navbar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .navbar-link {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+
+    .navbar-link:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .navbar-link.active {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .navbar-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 2px;
+      background: var(--accent-decision);
+      border-radius: 1px;
+    }
+
+    .nav-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      background: var(--confidence-low);
+      color: #fff;
+      padding: 1px 6px;
+      border-radius: 10px;
+      line-height: 1.4;
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .navbar-settings {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--text-tertiary);
+      text-decoration: none;
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      transition: all var(--transition-fast);
+    }
+
+    .navbar-settings:hover {
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4F46E5, #7C3AED);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: #fff;
+      cursor: pointer;
+      transition: box-shadow var(--transition-fast);
+      border: 2px solid transparent;
+    }
+
+    .user-avatar:hover {
+      border-color: var(--border-medium);
+      box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+    }
+
+    /* ========================================
+       Main Content Area
+       ======================================== */
+    .main-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ========================================
+       Page Header
+       ======================================== */
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.03em;
+    }
+
+    .pending-badge {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: var(--bg-tertiary);
+      padding: 4px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .pending-badge strong {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    /* ========================================
+       Filter Bar
+       ======================================== */
+    .filter-bar {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      animation: fadeSlideUp 0.35s ease;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-control {
+      position: relative;
+    }
+
+    .filter-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .filter-select {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 7px 32px 7px 12px;
+      appearance: none;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236B7189' viewBox='0 0 16 16'%3E%3Cpath d='M8 11.5l-5-5h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    .filter-select:hover {
+      border-color: var(--border-medium);
+      background-color: var(--bg-tertiary);
+    }
+
+    .filter-select:focus {
+      border-color: var(--accent-decision);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    }
+
+    .confidence-slider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .confidence-slider .slider-value {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 7px 8px;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .confidence-slider .slider-dash {
+      color: var(--text-tertiary);
+      font-size: 0.75rem;
+    }
+
+    .confidence-slider input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 140px;
+      height: 4px;
+      background: var(--bg-quaternary);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .confidence-slider input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-decision);
+      border: 2px solid var(--bg-primary);
+      cursor: pointer;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .filter-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--border-subtle);
+      margin: 0 4px;
+      align-self: flex-end;
+      margin-bottom: 2px;
+    }
+
+    .filter-bottom-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .group-by {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .group-by-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+    }
+
+    .toggle-group {
+      display: flex;
+      background: var(--bg-quaternary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+
+    .toggle-option {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      padding: 5px 14px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: none;
+      background: transparent;
+    }
+
+    .toggle-option:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .toggle-option.active {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      box-shadow: inset 0 0 0 1px var(--border-medium);
+    }
+
+    .btn-expand-all {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-expand-all:hover {
+      color: var(--text-secondary);
+      border-color: var(--border-medium);
+      background: var(--bg-tertiary);
+    }
+
+    /* ========================================
+       Group Sections
+       ======================================== */
+    .review-group {
+      margin-bottom: 28px;
+      animation: fadeSlideUp 0.4s ease backwards;
+    }
+
+    .review-group:nth-child(1) { animation-delay: 0.05s; }
+    .review-group:nth-child(2) { animation-delay: 0.12s; }
+    .review-group:nth-child(3) { animation-delay: 0.19s; }
+    .review-group:nth-child(4) { animation-delay: 0.26s; }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-left: 3px solid var(--accent-decision);
+      background: var(--bg-secondary);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-bottom: 12px;
+      user-select: none;
+    }
+
+    .group-header:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .group-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .group-chevron {
+      color: var(--text-tertiary);
+      font-size: 0.7rem;
+      transition: transform var(--transition-fast);
+      width: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .group-header.collapsed .group-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .group-title {
+      font-family: var(--font-display);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .group-count {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: var(--bg-quaternary);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .group-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-left: 3px;
+    }
+
+    /* ========================================
+       Review Cards — Base
+       ======================================== */
+    .review-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      transition: all var(--transition-fast);
+      animation: fadeSlideUp 0.4s ease backwards;
+    }
+
+    .review-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .review-card[data-entity="task"]::before { background: var(--accent-task); }
+    .review-card[data-entity="decision"]::before { background: var(--accent-decision); }
+    .review-card[data-entity="insight"]::before { background: var(--accent-insight); }
+    .review-card[data-entity="mixed"]::before {
+      background: linear-gradient(90deg, var(--accent-task), var(--accent-decision), var(--accent-insight));
+    }
+    .review-card[data-entity="duplicate"]::before {
+      background: linear-gradient(90deg, var(--accent-task) 50%, var(--accent-task) 50%);
+    }
+
+    .review-card:hover {
+      border-color: var(--border-medium);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 16px;
+    }
+
+    .card-entity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .entity-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .entity-badge.task {
+      color: var(--accent-task);
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .entity-badge.decision {
+      color: var(--accent-decision);
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .entity-badge.insight {
+      color: var(--accent-insight);
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .entity-name {
+      font-family: var(--font-body);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.35;
+    }
+
+    /* ========================================
+       Confidence Score
+       ======================================== */
+    .confidence {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .confidence-bar-wrap {
+      width: 48px;
+      height: 4px;
+      background: var(--bg-quaternary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .confidence-bar {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .confidence-bar.high {
+      background: linear-gradient(90deg, #059669, var(--confidence-high));
+    }
+
+    .confidence-bar.medium {
+      background: linear-gradient(90deg, #D97706, var(--confidence-medium));
+    }
+
+    .confidence-bar.low {
+      background: linear-gradient(90deg, #DC2626, var(--confidence-low));
+    }
+
+    .confidence-value {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .confidence-value.high { color: var(--confidence-high); }
+    .confidence-value.medium { color: var(--confidence-medium); }
+    .confidence-value.low { color: var(--confidence-low); }
+
+    /* ========================================
+       Card Details
+       ======================================== */
+    .card-suggestion {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 0.8125rem;
+    }
+
+    .suggestion-label {
+      color: var(--text-tertiary);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .suggestion-value {
+      color: var(--accent-decision);
+      font-weight: 600;
+    }
+
+    .card-reason {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      border-left: 2px solid var(--border-medium);
+      line-height: 1.55;
+    }
+
+    .card-source {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      margin-bottom: 16px;
+    }
+
+    .source-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-quaternary);
+      font-size: 0.6rem;
+    }
+
+    .source-text {
+      font-style: italic;
+      color: var(--text-secondary);
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .source-meta {
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+    }
+
+    /* ========================================
+       Action Buttons
+       ======================================== */
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .btn {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .btn-accept {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--action-accept);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-accept:hover {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
+    }
+
+    .btn-reject {
+      background: transparent;
+      color: var(--action-reject);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-reject:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+
+    .btn-modify {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--action-modify);
+      border-color: rgba(139, 92, 246, 0.25);
+    }
+
+    .btn-modify:hover {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-tertiary);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+      border-color: var(--border-medium);
+    }
+
+    .btn-neutral {
+      background: var(--bg-quaternary);
+      color: var(--text-secondary);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-neutral:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      border-color: var(--border-medium);
+    }
+
+    .actions-spacer {
+      flex: 1;
+    }
+
+    /* ========================================
+       Epic Creation Card
+       ======================================== */
+    .epic-description {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+      line-height: 1.55;
+    }
+
+    .epic-entities {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+
+    .epic-entities-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .epic-entity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+    }
+
+    .epic-entity-item + .epic-entity-item {
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .epic-entity-item .entity-badge {
+      font-size: 0.6rem;
+      padding: 2px 6px;
+    }
+
+    .epic-entity-name {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .status-pill {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: lowercase;
+    }
+
+    .status-pill.needs-action {
+      color: var(--accent-task);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .status-pill.captured {
+      color: var(--text-tertiary);
+      background: var(--bg-quaternary);
+    }
+
+    .status-pill.in-progress {
+      color: var(--accent-decision);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .status-pill.pending {
+      color: var(--action-modify);
+      background: rgba(139, 92, 246, 0.1);
+    }
+
+    /* ========================================
+       Duplicate Detection Card
+       ======================================== */
+    .duplicate-comparison {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 0;
+      margin-bottom: 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .duplicate-entity {
+      padding: 16px;
+    }
+
+    .duplicate-entity-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .duplicate-entity-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .duplicate-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .duplicate-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+    }
+
+    .meta-label {
+      color: var(--text-tertiary);
+      font-weight: 500;
+      min-width: 48px;
+    }
+
+    .meta-value {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .duplicate-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      background: var(--bg-quaternary);
+      border-left: 1px solid var(--border-subtle);
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .duplicate-vs {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .similarity-bar-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .similarity-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .similarity-bar-wrap {
+      flex: 1;
+      max-width: 200px;
+      height: 6px;
+      background: var(--bg-quaternary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .similarity-bar {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #059669, var(--confidence-high));
+    }
+
+    .similarity-value {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--confidence-high);
+    }
+
+    /* ========================================
+       Low Confidence Card
+       ======================================== */
+    .low-conf-source-text {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      font-style: italic;
+      padding-left: 14px;
+      border-left: 2px solid var(--border-medium);
+      line-height: 1.5;
+    }
+
+    .low-conf-classified {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .low-conf-classified strong {
+      font-weight: 600;
+    }
+
+    .low-conf-table {
+      width: 100%;
+      max-width: 460px;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 0.8125rem;
+    }
+
+    .low-conf-table th {
+      text-align: left;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 6px 12px 6px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .low-conf-table td {
+      padding: 8px 12px 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: middle;
+    }
+
+    .low-conf-table .field-name {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .low-conf-table .field-score {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .mini-bar-wrap {
+      width: 60px;
+      height: 4px;
+      background: var(--bg-quaternary);
+      border-radius: 2px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .mini-bar {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .low-conf-table .field-note {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      font-style: italic;
+    }
+
+    .low-conf-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .inline-select {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 6px 28px 6px 10px;
+      appearance: none;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%236B7189' viewBox='0 0 16 16'%3E%3Cpath d='M8 11.5l-5-5h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+
+    .inline-select:hover {
+      border-color: var(--border-medium);
+    }
+
+    .inline-select:focus {
+      border-color: var(--accent-decision);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    }
+
+    .inline-label {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      font-weight: 500;
+    }
+
+    /* ========================================
+       SVG Icons (inline)
+       ======================================== */
+    .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .icon svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ========================================
+       Card Stacking Animations
+       ======================================== */
+    .group-cards .review-card:nth-child(1) { animation-delay: 0.08s; }
+    .group-cards .review-card:nth-child(2) { animation-delay: 0.14s; }
+    .group-cards .review-card:nth-child(3) { animation-delay: 0.20s; }
+    .group-cards .review-card:nth-child(4) { animation-delay: 0.26s; }
+
+    /* ========================================
+       Responsive Adjustments
+       ======================================== */
+    @media (max-width: 900px) {
+      .duplicate-comparison {
+        grid-template-columns: 1fr;
+      }
+      .duplicate-divider {
+        width: 100%;
+        height: 36px;
+        border-left: none;
+        border-right: none;
+        border-top: 1px solid var(--border-subtle);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .filter-divider {
+        display: none;
+      }
+      .card-top {
+        flex-direction: column;
+      }
+    }
+
+    /* ========================================
+       Scrollbar Styling
+       ======================================== */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-quaternary);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border-medium);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================
+       Global Navigation Bar
+       ============================================ -->
+  <nav class="navbar">
+    <a href="#" class="navbar-logo">
+      <span class="logo-mark">PM</span>
+      PM Agent
+    </a>
+
+    <div class="navbar-center">
+      <a href="#" class="navbar-link">
+        <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6h12"/></svg></span>
+        Projects
+      </a>
+      <a href="#" class="navbar-link active">
+        <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h7M3 12h5"/></svg></span>
+        Review Queue
+        <span class="nav-badge">12</span>
+      </a>
+      <a href="#" class="navbar-link">
+        <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M8 5.5v5M5.5 8h5"/></svg></span>
+        Capture
+      </a>
+    </div>
+
+    <div class="navbar-right">
+      <a href="#" class="navbar-settings">
+        <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.76 3.76l1.41 1.41M10.83 10.83l1.41 1.41M3.76 12.24l1.41-1.41M10.83 5.17l1.41-1.41"/></svg></span>
+        Settings
+      </a>
+      <div class="user-avatar" title="Tejas DC">TC</div>
+    </div>
+  </nav>
+
+  <!-- ============================================
+       Main Content
+       ============================================ -->
+  <main class="main-content">
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <h1 class="page-title">Review Queue</h1>
+      <span class="pending-badge"><strong>12</strong> pending</span>
+    </header>
+
+    <!-- Filter Bar -->
+    <section class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-control">
+          <label class="filter-label">Type</label>
+          <select class="filter-select">
+            <option>All Types</option>
+            <option>Tasks</option>
+            <option>Decisions</option>
+            <option>Insights</option>
+          </select>
+        </div>
+
+        <div class="filter-control">
+          <label class="filter-label">Project</label>
+          <select class="filter-select">
+            <option>All Projects</option>
+            <option>Web App Redesign</option>
+            <option>Billing System</option>
+            <option>Mobile App</option>
+          </select>
+        </div>
+
+        <div class="filter-divider"></div>
+
+        <div class="filter-control">
+          <label class="filter-label">Confidence Range</label>
+          <div class="confidence-slider">
+            <span class="slider-value">0.3</span>
+            <input type="range" min="0" max="100" value="30">
+            <span class="slider-dash">&mdash;</span>
+            <input type="range" min="0" max="100" value="90">
+            <span class="slider-value">0.9</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-bottom-row">
+        <div class="group-by">
+          <span class="group-by-label">Group by:</span>
+          <div class="toggle-group">
+            <button class="toggle-option active">Review Type</button>
+            <button class="toggle-option">Entity Type</button>
+          </div>
+        </div>
+        <button class="btn-expand-all">
+          <span class="icon" style="width:12px;height:12px;margin-right:3px"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path d="M3 6l5 5 5-5"/></svg></span>
+          Expand All
+        </button>
+      </div>
+    </section>
+
+    <!-- =========================================
+         GROUP: PROJECT ASSIGNMENT (4 items)
+         ========================================= -->
+    <section class="review-group">
+      <div class="group-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.style.display = this.classList.contains('collapsed') ? 'none' : 'flex';">
+        <div class="group-header-left">
+          <span class="group-chevron">&#9660;</span>
+          <h2 class="group-title">Project Assignment</h2>
+          <span class="group-count">4 items</span>
+        </div>
+      </div>
+
+      <div class="group-cards">
+        <!-- Card 1: Task - Redesign onboarding flow -->
+        <article class="review-card" data-entity="task">
+          <div class="card-top">
+            <div class="card-entity">
+              <span class="entity-badge task">Task</span>
+              <span class="entity-name">Redesign onboarding flow</span>
+            </div>
+            <div class="confidence">
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar medium" style="width: 72%;"></div>
+              </div>
+              <span class="confidence-value medium">0.72</span>
+            </div>
+          </div>
+
+          <div class="card-suggestion">
+            <span class="suggestion-label">AI suggests:</span>
+            <span class="suggestion-value">Project &ldquo;Web App Redesign&rdquo;</span>
+          </div>
+
+          <div class="card-reason">
+            Content mentions onboarding, matches 3 existing tasks in this project with similar context and keywords.
+          </div>
+
+          <div class="card-source">
+            <span class="source-icon">#</span>
+            <span class="source-text">&ldquo;The onboarding flow is confusing and users drop off at step 3...&rdquo;</span>
+            <span class="source-meta">Slack &bull; 2h ago</span>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-accept">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"/></svg></span>
+              Accept
+            </button>
+            <button class="btn btn-modify">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path d="M4 12h8M4 8h8M4 4h5"/></svg></span>
+              Change Project &#9662;
+            </button>
+            <button class="btn btn-reject">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+              Reject
+            </button>
+            <span class="actions-spacer"></span>
+            <button class="btn btn-ghost">+ Comment</button>
+          </div>
+        </article>
+
+        <!-- Card 2: Decision - Use Stripe for payments -->
+        <article class="review-card" data-entity="decision">
+          <div class="card-top">
+            <div class="card-entity">
+              <span class="entity-badge decision">Decision</span>
+              <span class="entity-name">Use Stripe for payments</span>
+            </div>
+            <div class="confidence">
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar medium" style="width: 65%;"></div>
+              </div>
+              <span class="confidence-value medium">0.65</span>
+            </div>
+          </div>
+
+          <div class="card-suggestion">
+            <span class="suggestion-label">AI suggests:</span>
+            <span class="suggestion-value">Project &ldquo;Billing System&rdquo;</span>
+          </div>
+
+          <div class="card-reason">
+            Mentions Stripe, payment processing. Aligns with billing infrastructure work tracked in this project.
+          </div>
+
+          <div class="card-source">
+            <span class="source-icon">@</span>
+            <span class="source-text">&ldquo;We should go with Stripe for the payment integration, their API is solid...&rdquo;</span>
+            <span class="source-meta">Meeting notes &bull; 1d ago</span>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-accept">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"/></svg></span>
+              Accept
+            </button>
+            <button class="btn btn-modify">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path d="M4 12h8M4 8h8M4 4h5"/></svg></span>
+              Change Project &#9662;
+            </button>
+            <button class="btn btn-reject">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+              Reject
+            </button>
+            <span class="actions-spacer"></span>
+            <button class="btn btn-ghost">+ Comment</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- =========================================
+         GROUP: EPIC CREATION (2 items)
+         ========================================= -->
+    <section class="review-group">
+      <div class="group-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.style.display = this.classList.contains('collapsed') ? 'none' : 'flex';" style="border-left-color: var(--accent-insight);">
+        <div class="group-header-left">
+          <span class="group-chevron">&#9660;</span>
+          <h2 class="group-title">Epic Creation</h2>
+          <span class="group-count">2 items</span>
+        </div>
+      </div>
+
+      <div class="group-cards">
+        <!-- Epic Card -->
+        <article class="review-card" data-entity="mixed">
+          <div class="card-top">
+            <div class="card-entity">
+              <span class="entity-badge insight">Epic</span>
+              <span class="entity-name">AI suggests creating epic: &ldquo;User Authentication&rdquo; in project: Web App Redesign</span>
+            </div>
+            <div class="confidence">
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar high" style="width: 81%;"></div>
+              </div>
+              <span class="confidence-value high">0.81</span>
+            </div>
+          </div>
+
+          <p class="epic-description">
+            All work related to login, signup, password reset, and OAuth integration. Groups 4 related entities by semantic similarity and shared context.
+          </p>
+
+          <div class="epic-entities">
+            <div class="epic-entities-title">Entities to be grouped (4)</div>
+
+            <div class="epic-entity-item">
+              <span class="entity-badge task">Task</span>
+              <span class="epic-entity-name">Implement OAuth login</span>
+              <span class="status-pill needs-action">needs_action</span>
+            </div>
+
+            <div class="epic-entity-item">
+              <span class="entity-badge task">Task</span>
+              <span class="epic-entity-name">Add password reset flow</span>
+              <span class="status-pill captured">captured</span>
+            </div>
+
+            <div class="epic-entity-item">
+              <span class="entity-badge task">Task</span>
+              <span class="epic-entity-name">Build signup form validation</span>
+              <span class="status-pill in-progress">in_progress</span>
+            </div>
+
+            <div class="epic-entity-item">
+              <span class="entity-badge decision">Decision</span>
+              <span class="epic-entity-name">OAuth provider selection</span>
+              <span class="status-pill pending">pending</span>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-accept">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"/></svg></span>
+              Create Epic
+            </button>
+            <button class="btn btn-ghost">Edit Name/Desc...</button>
+            <button class="btn btn-reject">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+              Reject
+            </button>
+            <span class="actions-spacer"></span>
+            <button class="btn btn-ghost">+ Comment</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- =========================================
+         GROUP: DUPLICATE DETECTION (3 items)
+         ========================================= -->
+    <section class="review-group">
+      <div class="group-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.style.display = this.classList.contains('collapsed') ? 'none' : 'flex';" style="border-left-color: var(--accent-task);">
+        <div class="group-header-left">
+          <span class="group-chevron">&#9660;</span>
+          <h2 class="group-title">Duplicate Detection</h2>
+          <span class="group-count">3 items</span>
+        </div>
+      </div>
+
+      <div class="group-cards">
+        <!-- Duplicate Card -->
+        <article class="review-card" data-entity="duplicate">
+          <div class="card-top">
+            <div class="card-entity">
+              <span class="entity-badge task" style="background: rgba(239, 68, 68, 0.08); color: #f87171; border-color: rgba(239, 68, 68, 0.2);">Duplicate</span>
+              <span class="entity-name">Possible duplicate detected</span>
+            </div>
+            <div class="confidence">
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar high" style="width: 87%;"></div>
+              </div>
+              <span class="confidence-value high">0.87</span>
+            </div>
+          </div>
+
+          <div class="duplicate-comparison">
+            <div class="duplicate-entity">
+              <div class="duplicate-entity-label">Entity A</div>
+              <div class="duplicate-entity-name">Fix login button not responding on mobile Safari</div>
+              <div class="duplicate-meta">
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Status</span>
+                  <span class="status-pill needs-action">needs_action</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Project</span>
+                  <span class="meta-value">Web App</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Source</span>
+                  <span class="meta-value">Slack (#bugs)</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Date</span>
+                  <span class="meta-value">Feb 5</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="duplicate-divider">
+              <span class="duplicate-vs">VS</span>
+            </div>
+
+            <div class="duplicate-entity">
+              <div class="duplicate-entity-label">Entity B</div>
+              <div class="duplicate-entity-name">Login button not working on mobile Safari</div>
+              <div class="duplicate-meta">
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Status</span>
+                  <span class="status-pill captured">captured</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Project</span>
+                  <span class="meta-value">Web App</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Source</span>
+                  <span class="meta-value">CLI capture</span>
+                </div>
+                <div class="duplicate-meta-row">
+                  <span class="meta-label">Date</span>
+                  <span class="meta-value">Feb 6</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="similarity-bar-section">
+            <span class="similarity-label">Similarity:</span>
+            <div class="similarity-bar-wrap">
+              <div class="similarity-bar" style="width: 87%;"></div>
+            </div>
+            <span class="similarity-value">87%</span>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn btn-accept">Merge (keep A)</button>
+            <button class="btn btn-neutral">Merge (keep B)</button>
+            <button class="btn btn-reject">Not Duplicates</button>
+            <span class="actions-spacer"></span>
+            <button class="btn btn-ghost">+ Comment</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- =========================================
+         GROUP: LOW CONFIDENCE (3 items)
+         ========================================= -->
+    <section class="review-group">
+      <div class="group-header" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.style.display = this.classList.contains('collapsed') ? 'none' : 'flex';" style="border-left-color: var(--confidence-low);">
+        <div class="group-header-left">
+          <span class="group-chevron">&#9660;</span>
+          <h2 class="group-title">Low Confidence</h2>
+          <span class="group-count">3 items</span>
+        </div>
+      </div>
+
+      <div class="group-cards">
+        <!-- Low Confidence Card -->
+        <article class="review-card" data-entity="insight">
+          <div class="card-top">
+            <div class="card-entity">
+              <span class="entity-badge insight" style="background: rgba(239, 68, 68, 0.08); color: var(--confidence-low); border-color: rgba(239, 68, 68, 0.2);">Low Conf</span>
+              <span class="entity-name" style="font-weight: 500; color: var(--text-secondary);">Needs manual classification</span>
+            </div>
+            <div class="confidence">
+              <div class="confidence-bar-wrap">
+                <div class="confidence-bar low" style="width: 45%;"></div>
+              </div>
+              <span class="confidence-value low">0.45</span>
+            </div>
+          </div>
+
+          <blockquote class="low-conf-source-text">
+            &ldquo;We should probably look into caching at some point&rdquo;
+          </blockquote>
+
+          <p class="low-conf-classified">
+            AI classified as: <strong><span style="color: var(--accent-insight);">Insight</span></strong>
+          </p>
+
+          <table class="low-conf-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Score</th>
+                <th></th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="field-name">type</td>
+                <td>
+                  <span class="field-score" style="color: var(--confidence-low);">0.45</span>
+                  <span class="mini-bar-wrap">
+                    <span class="mini-bar" style="width: 45%; background: linear-gradient(90deg, #DC2626, var(--confidence-low));"></span>
+                  </span>
+                </td>
+                <td></td>
+                <td class="field-note">Could be Task or Insight</td>
+              </tr>
+              <tr>
+                <td class="field-name">project</td>
+                <td>
+                  <span class="field-score" style="color: var(--confidence-low);">0.38</span>
+                  <span class="mini-bar-wrap">
+                    <span class="mini-bar" style="width: 38%; background: linear-gradient(90deg, #DC2626, var(--confidence-low));"></span>
+                  </span>
+                </td>
+                <td></td>
+                <td class="field-note">No clear project match</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="card-source">
+            <span class="source-icon" style="font-size: 0.55rem;">&#127908;</span>
+            <span class="source-meta">Voice memo, Feb 6</span>
+            <span style="color: var(--accent-decision); font-size: 0.7rem; cursor: pointer;">(full transcript available)</span>
+          </div>
+
+          <div class="low-conf-actions">
+            <span class="inline-label">Type:</span>
+            <select class="inline-select">
+              <option selected>Task</option>
+              <option>Decision</option>
+              <option>Insight</option>
+            </select>
+
+            <span class="inline-label" style="margin-left: 8px;">Project:</span>
+            <select class="inline-select">
+              <option selected disabled>Select project...</option>
+              <option>Web App Redesign</option>
+              <option>Billing System</option>
+              <option>Mobile App</option>
+              <option>Infrastructure</option>
+            </select>
+
+            <button class="btn btn-accept" style="margin-left: 8px;">
+              <span class="icon"><svg fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="2"><path d="M3 8.5l3.5 3.5L13 5"/></svg></span>
+              Save
+            </button>
+            <span class="actions-spacer"></span>
+            <button class="btn btn-ghost">+ Comment</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

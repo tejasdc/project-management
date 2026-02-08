@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings / API Keys — PM Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ========================================
+       CSS Custom Properties
+       ======================================== */
+    :root {
+      --bg-primary: #0C0E14;
+      --bg-secondary: #13161F;
+      --bg-tertiary: #1A1E2A;
+      --bg-quaternary: #232836;
+      --border-subtle: #2A2F3E;
+      --border-medium: #3A4055;
+      --text-primary: #E8EAF0;
+      --text-secondary: #9BA1B5;
+      --text-tertiary: #6B7189;
+      --accent-task: #F59E0B;
+      --accent-decision: #3B82F6;
+      --accent-insight: #10B981;
+      --confidence-high: #10B981;
+      --confidence-medium: #F59E0B;
+      --confidence-low: #EF4444;
+      --action-reject: #EF4444;
+
+      --font-display: 'Bricolage Grotesque', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --transition-fast: 0.15s ease;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* ========================================
+       Reset & Base
+       ======================================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* ========================================
+       Noise Texture Overlay
+       ======================================== */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    /* ========================================
+       Animations
+       ======================================== */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.15), 0 0 20px rgba(245, 158, 11, 0.05);
+      }
+      50% {
+        box-shadow: 0 0 16px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.1);
+      }
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ========================================
+       Global Navigation Bar
+       ======================================== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 32px;
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      animation: slideDown 0.3s ease;
+    }
+
+    .navbar-logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .navbar-logo-icon {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--accent-insight), var(--accent-decision));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .navbar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .navbar-link {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      transition: color var(--transition-fast), background-color var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .navbar-link:hover {
+      color: var(--text-primary);
+      background-color: var(--bg-tertiary);
+    }
+
+    .navbar-link--active {
+      color: var(--text-primary);
+      background-color: var(--bg-tertiary);
+    }
+
+    .navbar-badge {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      background-color: var(--accent-decision);
+      color: #fff;
+      padding: 1px 7px;
+      border-radius: 10px;
+      line-height: 1.4;
+    }
+
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .navbar-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-task), var(--accent-decision));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      transition: box-shadow var(--transition-fast);
+    }
+
+    .navbar-avatar:hover {
+      box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--border-medium);
+    }
+
+    /* ========================================
+       Page Layout
+       ======================================== */
+    .page-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 32px 80px;
+    }
+
+    /* ========================================
+       Page Header
+       ======================================== */
+    .page-header {
+      margin-bottom: 32px;
+      animation: fadeInUp 0.4s ease;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.75rem;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    /* ========================================
+       Tabs
+       ======================================== */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 36px;
+      animation: fadeInUp 0.4s ease 0.05s both;
+    }
+
+    .tab {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      padding: 12px 20px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      position: relative;
+      transition: color var(--transition-fast);
+    }
+
+    .tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .tab--active {
+      color: var(--accent-insight);
+    }
+
+    .tab--active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background-color: var(--accent-insight);
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* ========================================
+       Section Header
+       ======================================== */
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      animation: fadeInUp 0.4s ease 0.1s both;
+    }
+
+    .section-header-left {
+      flex: 1;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-description {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 560px;
+    }
+
+    /* ========================================
+       Buttons
+       ======================================== */
+    .btn {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+      line-height: 1;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-insight);
+      color: #fff;
+      padding: 10px 18px;
+    }
+
+    .btn-primary:hover {
+      background-color: #0ea472;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 10px 18px;
+      border: 1px solid var(--border-medium);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text-primary);
+      border-color: var(--text-tertiary);
+      background-color: var(--bg-tertiary);
+    }
+
+    .btn-danger {
+      background-color: var(--action-reject);
+      color: #fff;
+      padding: 10px 18px;
+    }
+
+    .btn-danger:hover {
+      background-color: #dc2626;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-danger-outline {
+      background: transparent;
+      color: var(--action-reject);
+      padding: 6px 12px;
+      border: 1px solid var(--action-reject);
+      font-size: 0.75rem;
+    }
+
+    .btn-danger-outline:hover {
+      background-color: var(--action-reject);
+      color: #fff;
+    }
+
+    .btn-icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    /* ========================================
+       API Keys Table
+       ======================================== */
+    .api-keys-table-wrapper {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      animation: fadeInUp 0.4s ease 0.15s both;
+    }
+
+    .api-keys-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .api-keys-table thead th {
+      font-family: var(--font-body);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-tertiary);
+      text-align: left;
+      padding: 12px 20px;
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .api-keys-table tbody tr {
+      transition: background-color var(--transition-fast);
+    }
+
+    .api-keys-table tbody tr:nth-child(odd) {
+      background-color: var(--bg-secondary);
+    }
+
+    .api-keys-table tbody tr:nth-child(even) {
+      background-color: rgba(26, 30, 42, 0.4);
+    }
+
+    .api-keys-table tbody tr:hover:not(.row--revoked) {
+      background-color: var(--bg-tertiary);
+    }
+
+    .api-keys-table td {
+      padding: 14px 20px;
+      font-size: 0.875rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .api-keys-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .key-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .key-prefix {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+    }
+
+    .key-date {
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+    }
+
+    .key-last-used {
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+    }
+
+    .key-last-used--never {
+      color: var(--text-tertiary);
+      font-style: italic;
+    }
+
+    .row--revoked {
+      opacity: 0.5;
+    }
+
+    .row--revoked .key-name {
+      text-decoration: line-through;
+      color: var(--text-tertiary);
+    }
+
+    .revoked-label {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      font-style: italic;
+    }
+
+    /* ========================================
+       Dialog Showcase Section
+       ======================================== */
+    .dialog-showcase {
+      margin-top: 64px;
+      padding-top: 48px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .dialog-showcase-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 40px;
+    }
+
+    .dialog-section {
+      margin-bottom: 48px;
+      animation: fadeInUp 0.4s ease 0.2s both;
+    }
+
+    .dialog-section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dialog-section-label::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-insight);
+    }
+
+    .dialog-section:nth-child(3) .dialog-section-label::before {
+      background-color: var(--accent-task);
+    }
+
+    .dialog-section:nth-child(4) .dialog-section-label::before {
+      background-color: var(--action-reject);
+    }
+
+    /* ========================================
+       Modal / Dialog Card
+       ======================================== */
+    .modal-backdrop {
+      background-color: rgba(12, 14, 20, 0.7);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .modal-card--warning {
+      border-top: 3px solid var(--accent-task);
+      max-width: 600px;
+      animation: pulseGlow 3s ease-in-out infinite;
+    }
+
+    .modal-card--danger {
+      border-top: 3px solid var(--action-reject);
+      max-width: 480px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 0;
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+    }
+
+    .modal-close {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      transition: all var(--transition-fast);
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+      background-color: var(--bg-tertiary);
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-subtle);
+      background-color: rgba(19, 22, 31, 0.5);
+    }
+
+    /* ========================================
+       Form Elements
+       ======================================== */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      padding: 10px 14px;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .form-input:focus {
+      border-color: var(--accent-insight);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+    }
+
+    /* ========================================
+       Code Block
+       ======================================== */
+    .code-block {
+      background-color: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .key-display {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--accent-insight);
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .key-display-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-copy {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 500;
+      background-color: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-copy:hover {
+      background-color: var(--bg-quaternary);
+      color: var(--text-primary);
+      border-color: var(--text-tertiary);
+    }
+
+    /* ========================================
+       Warning Callout
+       ======================================== */
+    .warning-callout {
+      background-color: rgba(245, 158, 11, 0.06);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 0.8125rem;
+      color: var(--accent-task);
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    .warning-callout strong {
+      font-weight: 600;
+    }
+
+    /* ========================================
+       Usage Examples
+       ======================================== */
+    .usage-section-title {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      margin-top: 4px;
+    }
+
+    .usage-example {
+      margin-bottom: 12px;
+    }
+
+    .usage-example:last-child {
+      margin-bottom: 0;
+    }
+
+    .usage-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+    }
+
+    /* ========================================
+       Destructive Dialog Text
+       ======================================== */
+    .modal-body-text {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .modal-body-text strong {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* ========================================
+       SVG Icons (inline)
+       ======================================== */
+    .icon-plus::before {
+      content: '+';
+      font-weight: 600;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .icon-clipboard {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====================================
+       Global Navigation Bar
+       ==================================== -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <a href="#" class="navbar-logo">
+      <span class="navbar-logo-icon" aria-hidden="true">P</span>
+      PM Agent
+    </a>
+
+    <div class="navbar-center">
+      <a href="#" class="navbar-link">Projects</a>
+      <a href="#" class="navbar-link">
+        Review Queue
+        <span class="navbar-badge" aria-label="12 pending reviews">12</span>
+      </a>
+      <a href="#" class="navbar-link">Capture</a>
+    </div>
+
+    <div class="navbar-right">
+      <a href="#" class="navbar-link navbar-link--active">Settings</a>
+      <div class="navbar-avatar" role="img" aria-label="User avatar">TD</div>
+    </div>
+  </nav>
+
+  <!-- ====================================
+       Page Container
+       ==================================== -->
+  <main class="page-container">
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <h1 class="page-title">Settings</h1>
+    </header>
+
+    <!-- Settings Tabs -->
+    <div class="tabs" role="tablist">
+      <button class="tab tab--active" role="tab" aria-selected="true">API Keys</button>
+      <button class="tab" role="tab" aria-selected="false">Profile</button>
+      <button class="tab" role="tab" aria-selected="false">Preferences</button>
+    </div>
+
+    <!-- Section Header -->
+    <div class="section-header">
+      <div class="section-header-left">
+        <h2 class="section-title">API Keys</h2>
+        <p class="section-description">API keys authenticate CLI tools, MCP servers, and other integrations. Keep your keys secret.</p>
+      </div>
+      <button class="btn btn-primary">
+        <span class="btn-icon icon-plus" aria-hidden="true"></span>
+        Create New Key
+      </button>
+    </div>
+
+    <!-- API Keys Table -->
+    <div class="api-keys-table-wrapper">
+      <table class="api-keys-table">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Key Prefix</th>
+            <th scope="col">Created</th>
+            <th scope="col">Last Used</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="key-name">cli-laptop</span></td>
+            <td><span class="key-prefix">pm_k1_a8f3...</span></td>
+            <td><span class="key-date">Jan 15, 2026</span></td>
+            <td><span class="key-last-used">2 hours ago</span></td>
+            <td><button class="btn btn-danger-outline">Revoke</button></td>
+          </tr>
+          <tr>
+            <td><span class="key-name">mcp-server</span></td>
+            <td><span class="key-prefix">pm_k1_b2c4...</span></td>
+            <td><span class="key-date">Jan 20, 2026</span></td>
+            <td><span class="key-last-used">5 minutes ago</span></td>
+            <td><button class="btn btn-danger-outline">Revoke</button></td>
+          </tr>
+          <tr>
+            <td><span class="key-name">slack-bot</span></td>
+            <td><span class="key-prefix">pm_k1_d9e1...</span></td>
+            <td><span class="key-date">Feb 1, 2026</span></td>
+            <td><span class="key-last-used">1 day ago</span></td>
+            <td><button class="btn btn-danger-outline">Revoke</button></td>
+          </tr>
+          <tr>
+            <td><span class="key-name">ci-pipeline</span></td>
+            <td><span class="key-prefix">pm_k1_f3a7...</span></td>
+            <td><span class="key-date">Feb 3, 2026</span></td>
+            <td><span class="key-last-used key-last-used--never">Never</span></td>
+            <td><button class="btn btn-danger-outline">Revoke</button></td>
+          </tr>
+          <tr class="row--revoked">
+            <td><span class="key-name">old-laptop</span></td>
+            <td><span class="key-prefix">pm_k1_c5d2...</span></td>
+            <td><span class="key-date">Dec 10, 2025</span></td>
+            <td><span class="key-last-used">Jan 5, 2026</span></td>
+            <td><span class="revoked-label">Revoked</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ====================================
+         Dialog Showcase
+         ==================================== -->
+    <section class="dialog-showcase" aria-label="Dialog mockups">
+      <h3 class="dialog-showcase-title">Dialog States</h3>
+
+      <!-- Dialog 1: Create API Key -->
+      <div class="dialog-section">
+        <div class="dialog-section-label">Dialog: Create Key</div>
+        <div class="modal-backdrop">
+          <div class="modal-card" role="dialog" aria-labelledby="dialog-create-title">
+            <div class="modal-header">
+              <h4 class="modal-title" id="dialog-create-title">Create API Key</h4>
+              <button class="modal-close" aria-label="Close dialog">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label" for="key-name-input">Key Name</label>
+                <input
+                  type="text"
+                  id="key-name-input"
+                  class="form-input"
+                  placeholder="e.g., cli-laptop, mcp-server"
+                >
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-primary">Create Key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialog 2: API Key Created -->
+      <div class="dialog-section">
+        <div class="dialog-section-label">Dialog: Key Created</div>
+        <div class="modal-backdrop">
+          <div class="modal-card modal-card--warning" role="dialog" aria-labelledby="dialog-created-title">
+            <div class="modal-header">
+              <h4 class="modal-title" id="dialog-created-title">API Key Created</h4>
+              <button class="modal-close" aria-label="Close dialog">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="key-display">
+                <span class="key-display-value">pm_k1_a8f3e2b1c4d5e6f7g8h9i0j1k2l3m4</span>
+                <button class="btn-copy" aria-label="Copy key to clipboard">
+                  <svg class="icon-clipboard" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                    <path d="M5 11H3.5A1.5 1.5 0 012 9.5v-7A1.5 1.5 0 013.5 1h7A1.5 1.5 0 0112 2.5V5"/>
+                  </svg>
+                  Copy to Clipboard
+                </button>
+              </div>
+
+              <div class="warning-callout">
+                <strong>Warning:</strong> This key will only be shown <strong>once</strong>. Copy it now and store it securely. If you lose it, you'll need to create a new one.
+              </div>
+
+              <p class="usage-section-title">Usage Examples</p>
+
+              <div class="usage-example">
+                <div class="usage-label">CLI</div>
+                <div class="code-block"><code>export PM_API_KEY="pm_k1_a8f3..."</code></div>
+              </div>
+
+              <div class="usage-example">
+                <div class="usage-label">MCP Config</div>
+                <div class="code-block"><code>{ "env": { "PM_API_KEY": "pm_k1_a8f3..." } }</code></div>
+              </div>
+
+              <div class="usage-example">
+                <div class="usage-label">HTTP</div>
+                <div class="code-block"><code>Authorization: Bearer pm_k1_a8f3...</code></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-primary">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialog 3: Revoke Confirmation -->
+      <div class="dialog-section">
+        <div class="dialog-section-label">Dialog: Revoke Confirmation</div>
+        <div class="modal-backdrop">
+          <div class="modal-card modal-card--danger" role="dialog" aria-labelledby="dialog-revoke-title">
+            <div class="modal-header">
+              <h4 class="modal-title" id="dialog-revoke-title">Revoke API Key</h4>
+              <button class="modal-close" aria-label="Close dialog">&times;</button>
+            </div>
+            <div class="modal-body">
+              <p class="modal-body-text">Are you sure you want to revoke the key <strong>'cli-laptop'</strong>? Any tools or integrations using this key will immediately lose access.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-danger">Revoke Key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PM Agent - Projects Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --bg-primary: #0C0E14;
+      --bg-secondary: #13161F;
+      --bg-tertiary: #1A1E2A;
+      --bg-quaternary: #232836;
+      --border-subtle: #2A2F3E;
+      --border-medium: #3A4055;
+      --text-primary: #E8EAF0;
+      --text-secondary: #9BA1B5;
+      --text-tertiary: #6B7189;
+      --accent-task: #F59E0B;
+      --accent-decision: #3B82F6;
+      --accent-insight: #10B981;
+      --confidence-high: #10B981;
+      --confidence-medium: #F59E0B;
+      --confidence-low: #EF4444;
+      --action-accept: #10B981;
+      --action-reject: #EF4444;
+      --action-modify: #8B5CF6;
+
+      --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15);
+      --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
+      --transition-fast: 0.15s ease;
+      --transition-medium: 0.25s ease;
+    }
+
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* ===== Noise Texture Overlay ===== */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    /* ===== Global Nav ===== */
+    .global-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 56px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-logo .logo-mark {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--accent-task), var(--accent-decision), var(--accent-insight));
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+
+    .nav-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-link {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-fast), background var(--transition-fast);
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .nav-link--active {
+      color: var(--text-primary);
+    }
+
+    .nav-link--active::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 14px;
+      right: 14px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 1px;
+    }
+
+    .nav-badge {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-task);
+      padding: 1px 7px;
+      border-radius: 10px;
+      line-height: 1.4;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-settings {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color var(--transition-fast);
+    }
+
+    .nav-settings:hover {
+      color: var(--text-primary);
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-decision), var(--action-modify));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: white;
+      cursor: pointer;
+      transition: box-shadow var(--transition-fast);
+      border: 2px solid transparent;
+    }
+
+    .user-avatar:hover {
+      border-color: var(--border-medium);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    /* ===== Main Content ===== */
+    .main-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 32px 64px;
+    }
+
+    /* ===== Page Header ===== */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .page-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .search-input {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 8px 14px 8px 36px;
+      width: 240px;
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7189' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-decision);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-new-project {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: white;
+      background: var(--accent-insight);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .btn-new-project:hover {
+      background: #0EA572;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-new-project:active {
+      transform: translateY(0);
+    }
+
+    /* ===== Status Tabs ===== */
+    .status-tabs {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 28px;
+    }
+
+    .status-tab {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      position: relative;
+      transition: color var(--transition-fast);
+    }
+
+    .status-tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .status-tab--active {
+      color: var(--text-primary);
+    }
+
+    .status-tab--active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 20px;
+      right: 20px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 1px 1px 0 0;
+    }
+
+    .tab-count {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      margin-left: 2px;
+    }
+
+    .status-tab--active .tab-count {
+      color: var(--text-secondary);
+    }
+
+    /* ===== Project Cards Grid ===== */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .projects-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .search-input {
+        width: 100%;
+      }
+
+      .main-content {
+        padding: 24px 16px 48px;
+      }
+
+      .global-nav {
+        padding: 0 16px;
+      }
+    }
+
+    /* ===== Project Card ===== */
+    .project-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+      box-shadow: var(--shadow-card);
+      opacity: 0;
+      transform: translateY(12px);
+      animation: cardFadeIn 0.4s ease forwards;
+    }
+
+    .project-card:nth-child(1) { animation-delay: 0.05s; }
+    .project-card:nth-child(2) { animation-delay: 0.1s; }
+    .project-card:nth-child(3) { animation-delay: 0.15s; }
+    .project-card:nth-child(4) { animation-delay: 0.2s; }
+    .project-card:nth-child(5) { animation-delay: 0.25s; }
+    .project-card:nth-child(6) { animation-delay: 0.3s; }
+    .project-card:nth-child(7) { animation-delay: 0.35s; }
+    .project-card:nth-child(8) { animation-delay: 0.4s; }
+
+    @keyframes cardFadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .project-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card-hover);
+      border-color: var(--border-medium);
+    }
+
+    /* Left gradient edge */
+    .project-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 2px;
+      height: 100%;
+      background: linear-gradient(
+        180deg,
+        var(--accent-task) 0%,
+        var(--accent-decision) 50%,
+        var(--accent-insight) 100%
+      );
+      opacity: 0.7;
+      transition: opacity var(--transition-fast);
+    }
+
+    .project-card:hover::before {
+      opacity: 1;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.0625rem;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+    }
+
+    .card-review-badge {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.4;
+    }
+
+    .card-review-badge--amber {
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--accent-task);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+    }
+
+    .card-review-badge--red {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--confidence-low);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      animation: subtlePulse 2.5s ease-in-out infinite;
+    }
+
+    .card-review-badge--pulse {
+      animation: subtlePulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes subtlePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .card-description {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    /* ===== Stats Grid ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 14px;
+      background: var(--bg-primary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .stat-column {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-column:not(:last-child) {
+      border-right: 1px solid var(--border-subtle);
+      padding-right: 12px;
+    }
+
+    .stat-column-header {
+      font-family: var(--font-body);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .stat-column-header .header-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .header-dot--tasks { background: var(--accent-task); }
+    .header-dot--decisions { background: var(--accent-decision); }
+    .header-dot--insights { background: var(--accent-insight); }
+
+    .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .stat-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .stat-dot--captured { background: var(--text-tertiary); }
+    .stat-dot--needs-action { background: var(--accent-task); }
+    .stat-dot--in-progress { background: var(--accent-decision); }
+    .stat-dot--done { background: var(--accent-insight); }
+    .stat-dot--pending { background: var(--accent-task); }
+    .stat-dot--decided { background: var(--accent-insight); }
+    .stat-dot--total { background: var(--accent-insight); }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    /* ===== Card Footer ===== */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .card-link {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--accent-decision);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: color var(--transition-fast), gap var(--transition-fast);
+    }
+
+    .card-link:hover {
+      color: #60A5FA;
+      gap: 8px;
+    }
+
+    .card-link .arrow {
+      transition: transform var(--transition-fast);
+      font-size: 0.875rem;
+    }
+
+    .card-link:hover .arrow {
+      transform: translateX(2px);
+    }
+
+    .card-more-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: none;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      letter-spacing: 2px;
+      line-height: 1;
+      padding-bottom: 4px;
+    }
+
+    .card-more-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    /* ===== Dropdown Menu ===== */
+    .dropdown-wrapper {
+      position: relative;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      min-width: 160px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+      z-index: 50;
+    }
+
+    .dropdown-wrapper:hover .dropdown-menu,
+    .dropdown-wrapper:focus-within .dropdown-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .dropdown-item {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+
+    .dropdown-item:hover {
+      background: var(--bg-quaternary);
+      color: var(--text-primary);
+    }
+
+    .dropdown-item--danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--confidence-low);
+    }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-medium);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-tertiary);
+    }
+
+    /* ===== Selection ===== */
+    ::selection {
+      background: rgba(59, 130, 246, 0.3);
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Global Navigation ===== -->
+  <nav class="global-nav" role="navigation" aria-label="Global navigation">
+    <a href="#" class="nav-logo">
+      <span class="logo-mark" aria-hidden="true"></span>
+      PM Agent
+    </a>
+
+    <div class="nav-center">
+      <a href="#" class="nav-link nav-link--active" aria-current="page">Projects</a>
+      <a href="#" class="nav-link">
+        Review Queue
+        <span class="nav-badge" aria-label="12 items pending review">12</span>
+      </a>
+      <a href="#" class="nav-link">Capture</a>
+    </div>
+
+    <div class="nav-right">
+      <a href="#" class="nav-settings">Settings</a>
+      <div class="user-avatar" role="img" aria-label="User avatar for Tejas DC" tabindex="0">TC</div>
+    </div>
+  </nav>
+
+  <!-- ===== Main Content ===== -->
+  <main class="main-content">
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <h1 class="page-title">Projects</h1>
+      <div class="page-actions">
+        <input
+          type="search"
+          class="search-input"
+          placeholder="Search projects..."
+          aria-label="Search projects"
+        >
+        <button class="btn-new-project" type="button">
+          <span aria-hidden="true">+</span> New Project
+        </button>
+      </div>
+    </header>
+
+    <!-- Status Tabs -->
+    <div class="status-tabs" role="tablist" aria-label="Project status filter">
+      <button class="status-tab status-tab--active" role="tab" aria-selected="true">
+        Active <span class="tab-count">(8)</span>
+      </button>
+      <button class="status-tab" role="tab" aria-selected="false">
+        Archived <span class="tab-count">(3)</span>
+      </button>
+    </div>
+
+    <!-- Project Cards Grid -->
+    <div class="projects-grid" role="tabpanel">
+
+      <!-- Card 1: Web App Redesign -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Web App Redesign</h2>
+          <span class="card-review-badge card-review-badge--amber card-review-badge--pulse" aria-label="4 reviews pending">4 pending</span>
+        </div>
+        <p class="card-description">Complete overhaul of the customer-facing web app</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">12</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">8</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">5</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">21</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">3</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">7</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">6</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 2: Billing System -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Billing System</h2>
+          <span class="card-review-badge card-review-badge--amber" aria-label="1 review pending">1 pending</span>
+        </div>
+        <p class="card-description">Payment processing and subscription management</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">5</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">4</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">2</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">9</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">1</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">2</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">3</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 3: Mobile App -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Mobile App</h2>
+        </div>
+        <p class="card-description">React Native mobile client</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">3</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">2</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">1</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">6</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">4</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">2</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 4: Internal Tools -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Internal Tools</h2>
+          <span class="card-review-badge card-review-badge--red" aria-label="7 reviews pending, high priority">7 pending</span>
+        </div>
+        <p class="card-description">Developer productivity tooling</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">7</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">3</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">4</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">11</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">2</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">1</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">9</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 5: API Platform -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">API Platform</h2>
+          <span class="card-review-badge card-review-badge--amber" aria-label="2 reviews pending">2 pending</span>
+        </div>
+        <p class="card-description">Public API gateway and developer documentation portal</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">9</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">6</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">3</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">14</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">2</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">5</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">4</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 6: Analytics Dashboard -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Analytics Dashboard</h2>
+          <span class="card-review-badge card-review-badge--amber card-review-badge--pulse" aria-label="5 reviews pending">5 pending</span>
+        </div>
+        <p class="card-description">Real-time metrics visualization and reporting engine</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">15</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">10</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">7</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">28</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">4</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">9</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">11</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 7: Auth Service -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Auth Service</h2>
+        </div>
+        <p class="card-description">SSO, OAuth 2.0 flows, and role-based access control</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">2</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">1</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">18</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">6</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">5</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Card 8: Data Pipeline -->
+      <article class="project-card">
+        <div class="card-header">
+          <h2 class="card-title">Data Pipeline</h2>
+          <span class="card-review-badge card-review-badge--amber" aria-label="3 reviews pending">3 pending</span>
+        </div>
+        <p class="card-description">ETL workflows, data lake ingestion, and batch processing</p>
+        <div class="stats-grid">
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--tasks" aria-hidden="true"></span>
+              Tasks
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--captured" aria-hidden="true"></span> captured</span>
+              <span class="stat-value">11</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--needs-action" aria-hidden="true"></span> needs action</span>
+              <span class="stat-value">5</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--in-progress" aria-hidden="true"></span> in progress</span>
+              <span class="stat-value">6</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--done" aria-hidden="true"></span> done</span>
+              <span class="stat-value">19</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--decisions" aria-hidden="true"></span>
+              Decisions
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--pending" aria-hidden="true"></span> pending</span>
+              <span class="stat-value">1</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--decided" aria-hidden="true"></span> decided</span>
+              <span class="stat-value">8</span>
+            </div>
+          </div>
+          <div class="stat-column">
+            <div class="stat-column-header">
+              <span class="header-dot header-dot--insights" aria-hidden="true"></span>
+              Insights
+            </div>
+            <div class="stat-row">
+              <span class="stat-label"><span class="stat-dot stat-dot--total" aria-hidden="true"></span> total</span>
+              <span class="stat-value">7</span>
+            </div>
+          </div>
+        </div>
+        <footer class="card-footer">
+          <a href="#" class="card-link">View Project <span class="arrow" aria-hidden="true">&rarr;</span></a>
+          <div class="dropdown-wrapper">
+            <button class="card-more-btn" aria-label="More actions" aria-haspopup="true">&hellip;</button>
+            <div class="dropdown-menu" role="menu">
+              <button class="dropdown-item" role="menuitem">Edit project</button>
+              <button class="dropdown-item" role="menuitem">Duplicate</button>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem">Archive</button>
+            </div>
+          </div>
+        </footer>
+      </article>
+
+    </div>
+  </main>
+
+</body>
+</html>

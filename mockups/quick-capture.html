@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Capture — PM Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ===================================================================
+       CSS Custom Properties
+       =================================================================== */
+    :root {
+      --bg-primary: #0C0E14;
+      --bg-secondary: #13161F;
+      --bg-tertiary: #1A1E2A;
+      --bg-quaternary: #232836;
+      --border-subtle: #2A2F3E;
+      --border-medium: #3A4055;
+      --text-primary: #E8EAF0;
+      --text-secondary: #9BA1B5;
+      --text-tertiary: #6B7189;
+      --accent-task: #F59E0B;
+      --accent-decision: #3B82F6;
+      --accent-insight: #10B981;
+      --confidence-high: #10B981;
+      --confidence-medium: #F59E0B;
+      --confidence-low: #EF4444;
+
+      /* Derived */
+      --accent-task-bg: rgba(245, 158, 11, 0.12);
+      --accent-decision-bg: rgba(59, 130, 246, 0.12);
+      --accent-insight-bg: rgba(16, 185, 129, 0.12);
+      --accent-insight-glow: rgba(16, 185, 129, 0.25);
+
+      /* Typography */
+      --font-display: 'Bricolage Grotesque', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      /* Transitions */
+      --transition-fast: 0.15s ease;
+      --transition-medium: 0.25s ease;
+
+      /* Radii */
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    /* ===================================================================
+       Reset & Base
+       =================================================================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ===================================================================
+       Noise Texture Overlay
+       =================================================================== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    /* ===================================================================
+       Utility Classes
+       =================================================================== */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ===================================================================
+       Section Divider
+       =================================================================== */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 80px 40px;
+    }
+
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-medium), transparent);
+    }
+
+    .section-divider span {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    /* ===================================================================
+       KBD Styling
+       =================================================================== */
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 2px 6px;
+      line-height: 1;
+      min-height: 22px;
+    }
+
+    /* ===================================================================
+       SECTION 1: Modal Version
+       =================================================================== */
+    .modal-scene {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* Backdrop */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(12, 14, 20, 0.80);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Faux app behind the modal */
+    .modal-scene-bg {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .modal-scene-bg-content {
+      opacity: 0.3;
+      padding: 60px 40px;
+    }
+
+    .modal-scene-bg-content .fake-nav {
+      height: 48px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: 24px;
+    }
+
+    .modal-scene-bg-content .fake-card {
+      height: 120px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+    }
+
+    /* Modal Card */
+    .modal-card {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 580px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        0 12px 40px rgba(0, 0, 0, 0.4),
+        0 24px 80px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      animation: modal-entry 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes modal-entry {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* Modal Header */
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .modal-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border-color: var(--border-medium);
+    }
+
+    /* Modal Body */
+    .modal-body {
+      padding: 20px;
+    }
+
+    /* Textarea */
+    .capture-textarea {
+      width: 100%;
+      min-height: 130px;
+      resize: vertical;
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .capture-textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .capture-textarea:focus {
+      border-color: var(--accent-insight);
+      box-shadow: 0 0 0 3px var(--accent-insight-glow), inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    /* Modal Footer */
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .modal-footer-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-footer-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Source Selector */
+    .source-selector {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .source-select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 28px 6px 10px;
+      cursor: pointer;
+      outline: none;
+      transition: all var(--transition-fast);
+    }
+
+    .source-select:hover {
+      border-color: var(--border-medium);
+      color: var(--text-primary);
+    }
+
+    .source-select:focus {
+      border-color: var(--accent-insight);
+    }
+
+    .source-selector::after {
+      content: '';
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid var(--text-tertiary);
+      pointer-events: none;
+    }
+
+    .footer-separator {
+      width: 1px;
+      height: 20px;
+      background: var(--border-subtle);
+    }
+
+    /* Capture Button */
+    .btn-capture {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-insight);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      letter-spacing: 0.01em;
+    }
+
+    .btn-capture:hover {
+      background: #0ea571;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-capture:active {
+      transform: translateY(0);
+    }
+
+    .shortcut-hint {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    /* Recent Captures — Modal */
+    .recent-captures-section {
+      border-top: 1px solid var(--border-subtle);
+      padding: 16px 20px;
+    }
+
+    .recent-captures-title {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .recent-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      transition: background var(--transition-fast);
+      animation: fade-slide-in 0.3s ease both;
+    }
+
+    .recent-item:nth-child(1) { animation-delay: 0.05s; }
+    .recent-item:nth-child(2) { animation-delay: 0.1s; }
+    .recent-item:nth-child(3) { animation-delay: 0.15s; }
+
+    @keyframes fade-slide-in {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .recent-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .recent-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .recent-item-text {
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      margin-bottom: 4px;
+    }
+
+    .recent-item-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .recent-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .meta-dot {
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: var(--border-medium);
+    }
+
+    /* Status Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 100px;
+      line-height: 1.4;
+    }
+
+    .status-processing {
+      color: var(--accent-insight);
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+    }
+
+    .status-processed {
+      color: var(--confidence-high);
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border: 1.5px solid rgba(16, 185, 129, 0.25);
+      border-top-color: var(--accent-insight);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Checkmark */
+    .checkmark {
+      display: inline-flex;
+      animation: checkmark-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes checkmark-pop {
+      from {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Entity Pills */
+    .entity-pills {
+      display: inline-flex;
+      gap: 6px;
+      margin-left: 2px;
+    }
+
+    .entity-pill {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 100px;
+      letter-spacing: 0.03em;
+      text-transform: capitalize;
+    }
+
+    .entity-pill-task {
+      color: var(--accent-task);
+      background: var(--accent-task-bg);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .entity-pill-decision {
+      color: var(--accent-decision);
+      background: var(--accent-decision-bg);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .entity-pill-insight {
+      color: var(--accent-insight);
+      background: var(--accent-insight-bg);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    /* ===================================================================
+       SECTION 2: Standalone Page Version
+       =================================================================== */
+    .standalone-page {
+      min-height: 100vh;
+      background: var(--bg-primary);
+    }
+
+    /* Global Nav */
+    .global-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .nav-logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent-insight), var(--accent-decision));
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-logo-icon svg {
+      width: 16px;
+      height: 16px;
+      fill: #fff;
+    }
+
+    .nav-logo-text {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+    }
+
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .nav-link.active {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .nav-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: #fff;
+      background: var(--confidence-low);
+      border-radius: 100px;
+      line-height: 1;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: border-color var(--transition-fast);
+    }
+
+    .nav-avatar:hover {
+      border-color: var(--border-medium);
+    }
+
+    .nav-icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .nav-icon-btn:hover {
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+      border-color: var(--border-subtle);
+    }
+
+    /* Standalone Content */
+    .standalone-content {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    .standalone-header {
+      margin-bottom: 32px;
+    }
+
+    .standalone-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .standalone-subtitle {
+      font-size: 15px;
+      color: var(--text-tertiary);
+    }
+
+    /* Standalone Capture Form */
+    .standalone-form {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 40px;
+    }
+
+    .standalone-form .capture-textarea {
+      border-radius: 0;
+      border: none;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-secondary);
+      min-height: 140px;
+      padding: 20px;
+      font-size: 15px;
+    }
+
+    .standalone-form .capture-textarea:focus {
+      box-shadow: inset 0 0 0 1px var(--accent-insight), 0 0 0 3px var(--accent-insight-glow);
+    }
+
+    .standalone-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+    }
+
+    /* Standalone Recent Captures */
+    .standalone-recent {
+      /* no extra wrapper styling needed */
+    }
+
+    .standalone-recent-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .standalone-recent-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .standalone-recent-count {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .standalone-recent-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .standalone-recent-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      transition: all var(--transition-fast);
+      animation: fade-slide-in 0.35s ease both;
+    }
+
+    .standalone-recent-item:nth-child(1) { animation-delay: 0.08s; }
+    .standalone-recent-item:nth-child(2) { animation-delay: 0.16s; }
+    .standalone-recent-item:nth-child(3) { animation-delay: 0.24s; }
+
+    .standalone-recent-item:hover {
+      border-color: var(--border-medium);
+      background: var(--bg-tertiary);
+    }
+
+    .standalone-item-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .standalone-item-text {
+      font-size: 15px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .standalone-item-bottom {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Source tag in standalone */
+    .source-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-tertiary);
+      background: var(--bg-quaternary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+
+    /* ===================================================================
+       SVG Icons (inline)
+       =================================================================== */
+    .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .icon-sm svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ===================================================================
+       Responsive
+       =================================================================== */
+    @media (max-width: 640px) {
+      .modal-card {
+        max-width: 100%;
+        border-radius: var(--radius-md);
+      }
+
+      .modal-footer {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .standalone-content {
+        padding: 32px 16px 60px;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================================================================
+       SECTION 1: Modal Version (overlay on dimmed background)
+       ================================================================== -->
+  <section class="modal-scene" aria-label="Quick Capture Modal Demo">
+
+    <!-- Faux application background -->
+    <div class="modal-scene-bg" aria-hidden="true">
+      <div class="modal-scene-bg-content">
+        <div class="fake-nav"></div>
+        <div class="fake-card"></div>
+        <div class="fake-card"></div>
+        <div class="fake-card"></div>
+      </div>
+    </div>
+
+    <!-- Backdrop -->
+    <div class="modal-backdrop" aria-hidden="true"></div>
+
+    <!-- Modal -->
+    <dialog class="modal-card" open aria-label="Quick Capture">
+
+      <!-- Header -->
+      <header class="modal-header">
+        <div class="modal-header-left">
+          <h2 class="modal-title">Quick Capture</h2>
+        </div>
+        <div class="modal-header-right">
+          <kbd>&#8984;K</kbd>
+          <button class="modal-close" type="button" aria-label="Close modal">&#10005;</button>
+        </div>
+      </header>
+
+      <!-- Body -->
+      <div class="modal-body">
+        <label for="capture-input-modal" class="visually-hidden">Capture your thought</label>
+        <textarea
+          id="capture-input-modal"
+          class="capture-textarea"
+          placeholder="Type your thought, idea, or note..."
+          rows="5"
+        ></textarea>
+      </div>
+
+      <!-- Footer -->
+      <footer class="modal-footer">
+        <div class="modal-footer-left">
+          <div class="source-selector">
+            <label for="source-modal" class="visually-hidden">Source</label>
+            <select id="source-modal" class="source-select">
+              <option value="web" selected>web</option>
+              <option value="cli">cli</option>
+              <option value="slack">slack</option>
+              <option value="api">api</option>
+              <option value="meeting">meeting</option>
+            </select>
+          </div>
+          <span class="footer-separator" aria-hidden="true"></span>
+        </div>
+        <div class="modal-footer-right">
+          <span class="shortcut-hint">or <kbd>&#8984;Enter</kbd></span>
+          <button class="btn-capture" type="button">
+            <span class="icon icon-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="8" r="6"/>
+                <circle cx="8" cy="8" r="2.5"/>
+              </svg>
+            </span>
+            Capture
+          </button>
+        </div>
+      </footer>
+
+      <!-- Recent Captures -->
+      <section class="recent-captures-section" aria-label="Recent captures">
+        <h3 class="recent-captures-title">Recent Captures</h3>
+        <ul class="recent-list">
+
+          <!-- Item 1: Processing -->
+          <li class="recent-item">
+            <div class="recent-item-content">
+              <p class="recent-item-text">We should add rate limiting to the API</p>
+              <div class="recent-item-meta">
+                <span class="recent-time">2 min ago</span>
+                <span class="meta-dot" aria-hidden="true"></span>
+                <span class="status-badge status-processing">
+                  <span class="spinner" aria-hidden="true"></span>
+                  Processing&hellip;
+                </span>
+              </div>
+            </div>
+          </li>
+
+          <!-- Item 2: Processed with Task + Decision -->
+          <li class="recent-item">
+            <div class="recent-item-content">
+              <p class="recent-item-text">Sarah mentioned the login flow needs rework</p>
+              <div class="recent-item-meta">
+                <span class="recent-time">15 min ago</span>
+                <span class="meta-dot" aria-hidden="true"></span>
+                <span class="status-badge status-processed">
+                  <span class="checkmark" aria-hidden="true">&#10003;</span>
+                  Processed
+                </span>
+                <span class="meta-dot" aria-hidden="true"></span>
+                <div class="entity-pills">
+                  <span class="entity-pill entity-pill-task">Task</span>
+                  <span class="entity-pill entity-pill-decision">Decision</span>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <!-- Item 3: Processed with Insight -->
+          <li class="recent-item">
+            <div class="recent-item-content">
+              <p class="recent-item-text">Competitor launched social login yesterday</p>
+              <div class="recent-item-meta">
+                <span class="recent-time">1 hour ago</span>
+                <span class="meta-dot" aria-hidden="true"></span>
+                <span class="status-badge status-processed">
+                  <span class="checkmark" aria-hidden="true">&#10003;</span>
+                  Processed
+                </span>
+                <span class="meta-dot" aria-hidden="true"></span>
+                <div class="entity-pills">
+                  <span class="entity-pill entity-pill-insight">Insight</span>
+                </div>
+              </div>
+            </div>
+          </li>
+
+        </ul>
+      </section>
+
+    </dialog>
+  </section>
+
+  <!-- ==================================================================
+       Divider between sections
+       ================================================================== -->
+  <div class="section-divider" role="separator">
+    <span>Standalone Page Version (/capture)</span>
+  </div>
+
+  <!-- ==================================================================
+       SECTION 2: Standalone Page Version
+       ================================================================== -->
+  <section class="standalone-page" aria-label="Standalone Capture Page Demo">
+
+    <!-- Global Nav -->
+    <nav class="global-nav" aria-label="Main navigation">
+      <div class="nav-left">
+        <a href="#" class="nav-logo" aria-label="PM Agent Home">
+          <span class="nav-logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3 2.5A1.5 1.5 0 0 1 4.5 1h7A1.5 1.5 0 0 1 13 2.5v11a.5.5 0 0 1-.724.447L8 11.618l-4.276 2.329A.5.5 0 0 1 3 13.5v-11z"/>
+            </svg>
+          </span>
+          <span class="nav-logo-text">PM Agent</span>
+        </a>
+
+        <ul class="nav-links">
+          <li><a href="#" class="nav-link">
+            <span class="icon icon-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="5" height="5" rx="1"/>
+                <rect x="9" y="2" width="5" height="5" rx="1"/>
+                <rect x="2" y="9" width="5" height="5" rx="1"/>
+                <rect x="9" y="9" width="5" height="5" rx="1"/>
+              </svg>
+            </span>
+            Projects
+          </a></li>
+          <li><a href="#" class="nav-link">
+            <span class="icon icon-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 4h12M2 8h12M2 12h8"/>
+              </svg>
+            </span>
+            Review Queue
+            <span class="nav-badge">3</span>
+          </a></li>
+          <li><a href="#" class="nav-link active" aria-current="page">
+            <span class="icon icon-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="8" r="6"/>
+                <circle cx="8" cy="8" r="2.5"/>
+              </svg>
+            </span>
+            Capture
+          </a></li>
+          <li><a href="#" class="nav-link">
+            <span class="icon icon-sm" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="8" r="6"/>
+                <path d="M8 5v3l2 2"/>
+              </svg>
+            </span>
+            Settings
+          </a></li>
+        </ul>
+      </div>
+
+      <div class="nav-right">
+        <button class="nav-icon-btn" type="button" aria-label="Notifications">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5a4 4 0 0 1 8 0c0 4.5 2 5.5 2 5.5H2s2-1 2-5.5z"/>
+            <path d="M6.5 13a1.5 1.5 0 0 0 3 0"/>
+          </svg>
+        </button>
+        <div class="nav-avatar" role="img" aria-label="User avatar">TC</div>
+      </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main class="standalone-content">
+
+      <header class="standalone-header">
+        <h1 class="standalone-title">Quick Capture</h1>
+        <p class="standalone-subtitle">Capture thoughts, ideas, and notes. AI will extract tasks, decisions, and insights.</p>
+      </header>
+
+      <!-- Capture Form -->
+      <form class="standalone-form" onsubmit="return false;">
+        <label for="capture-input-standalone" class="visually-hidden">Capture your thought</label>
+        <textarea
+          id="capture-input-standalone"
+          class="capture-textarea"
+          placeholder="Type your thought, idea, or note..."
+          rows="5"
+        ></textarea>
+        <div class="standalone-footer">
+          <div class="modal-footer-left">
+            <div class="source-selector">
+              <label for="source-standalone" class="visually-hidden">Source</label>
+              <select id="source-standalone" class="source-select">
+                <option value="web" selected>web</option>
+                <option value="cli">cli</option>
+                <option value="slack">slack</option>
+                <option value="api">api</option>
+                <option value="meeting">meeting</option>
+              </select>
+            </div>
+            <span class="footer-separator" aria-hidden="true"></span>
+          </div>
+          <div class="modal-footer-right">
+            <span class="shortcut-hint">or <kbd>&#8984;Enter</kbd></span>
+            <button class="btn-capture" type="submit">
+              <span class="icon icon-sm" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="8" cy="8" r="6"/>
+                  <circle cx="8" cy="8" r="2.5"/>
+                </svg>
+              </span>
+              Capture
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Recent Captures -->
+      <section class="standalone-recent" aria-label="Recent captures">
+        <div class="standalone-recent-header">
+          <h2 class="standalone-recent-title">Recent Captures</h2>
+          <span class="standalone-recent-count">3 captures today</span>
+        </div>
+
+        <ul class="standalone-recent-list">
+
+          <!-- Item 1: Processing -->
+          <li class="standalone-recent-item">
+            <div class="standalone-item-top">
+              <p class="standalone-item-text">We should add rate limiting to the API</p>
+              <span class="status-badge status-processing">
+                <span class="spinner" aria-hidden="true"></span>
+                Processing&hellip;
+              </span>
+            </div>
+            <div class="standalone-item-bottom">
+              <span class="recent-time">2 min ago</span>
+              <span class="meta-dot" aria-hidden="true"></span>
+              <span class="source-tag">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="8" cy="8" r="6"/>
+                  <path d="M5 8h6M8 5v6"/>
+                </svg>
+                web
+              </span>
+            </div>
+          </li>
+
+          <!-- Item 2: Processed with Task + Decision -->
+          <li class="standalone-recent-item">
+            <div class="standalone-item-top">
+              <p class="standalone-item-text">Sarah mentioned the login flow needs rework</p>
+              <span class="status-badge status-processed">
+                <span class="checkmark" aria-hidden="true">&#10003;</span>
+                Processed
+              </span>
+            </div>
+            <div class="standalone-item-bottom">
+              <span class="recent-time">15 min ago</span>
+              <span class="meta-dot" aria-hidden="true"></span>
+              <span class="source-tag">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="8" cy="8" r="6"/>
+                  <path d="M5 8h6M8 5v6"/>
+                </svg>
+                slack
+              </span>
+              <span class="meta-dot" aria-hidden="true"></span>
+              <div class="entity-pills">
+                <span class="entity-pill entity-pill-task">Task</span>
+                <span class="entity-pill entity-pill-decision">Decision</span>
+              </div>
+            </div>
+          </li>
+
+          <!-- Item 3: Processed with Insight -->
+          <li class="standalone-recent-item">
+            <div class="standalone-item-top">
+              <p class="standalone-item-text">Competitor launched social login yesterday</p>
+              <span class="status-badge status-processed">
+                <span class="checkmark" aria-hidden="true">&#10003;</span>
+                Processed
+              </span>
+            </div>
+            <div class="standalone-item-bottom">
+              <span class="recent-time">1 hour ago</span>
+              <span class="meta-dot" aria-hidden="true"></span>
+              <span class="source-tag">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="8" cy="8" r="6"/>
+                  <path d="M5 8h6M8 5v6"/>
+                </svg>
+                meeting
+              </span>
+              <span class="meta-dot" aria-hidden="true"></span>
+              <div class="entity-pills">
+                <span class="entity-pill entity-pill-insight">Insight</span>
+              </div>
+            </div>
+          </li>
+
+        </ul>
+      </section>
+
+    </main>
+  </section>
+
+</body>
+</html>
