@@ -9,6 +9,7 @@ import { db } from "../db/index.js";
 import { reviewQueue } from "../db/schema/index.js";
 import { decodeCursor, encodeCursor, parseLimit } from "../lib/pagination.js";
 import { resolveReviewBatch, resolveReviewItem } from "../services/review.js";
+import { publishEvent } from "../services/events.js";
 
 const reviewIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -101,6 +102,7 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         resolvedByUserId: user.id,
       });
 
+      await publishEvent("review_queue:resolved", { id: res.item.id, status: res.item.status, reviewType: res.item.reviewType, entityId: res.item.entityId, projectId: res.item.projectId });
       return c.json(res);
     }
   )
@@ -118,7 +120,7 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
         resolvedByUserId: user.id,
       });
 
+      await publishEvent("review_queue:resolved_batch", { count: res.items.length });
       return c.json(res);
     }
   );
-

@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0c0e14;
+  --bg-secondary: #13161f;
+  --bg-tertiary: #1a1e2a;
+  --bg-quaternary: #232836;
+
+  --border-subtle: #2a2f3e;
+  --border-medium: #3a4055;
+
+  --text-primary: #e8eaf0;
+  --text-secondary: #9ba1b5;
+  --text-tertiary: #6b7189;
+
+  --accent-task: #f59e0b;
+  --accent-decision: #3b82f6;
+  --accent-insight: #10b981;
+
+  --confidence-high: #10b981;
+  --confidence-medium: #f59e0b;
+  --confidence-low: #ef4444;
+
+  --action-accept: #10b981;
+  --action-reject: #ef4444;
+  --action-modify: #8b5cf6;
+
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Noise texture overlay (cheap + effective atmosphere). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeSlideUp 320ms ease both;
+}
+
