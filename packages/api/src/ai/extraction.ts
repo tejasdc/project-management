@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 import { extractionResultSchema } from "./schemas/extraction-schema.js";
 
@@ -354,7 +354,7 @@ export async function extractEntities(opts: {
         {
           name: "extract_entities",
           description: "Extract structured entities from the raw note. Call this tool exactly once.",
-          input_schema: zodToJsonSchema(extractionResultSchema as any) as any,
+          input_schema: (() => { const { $schema, ...rest } = z.toJSONSchema(extractionResultSchema); return rest; })() as any,
         },
       ],
       tool_choice: { type: "tool", name: "extract_entities" },

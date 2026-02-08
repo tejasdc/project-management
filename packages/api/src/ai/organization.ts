@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 import { organizationResultSchema } from "./schemas/organization-schema.js";
 
@@ -256,7 +256,7 @@ export async function organizeEntities(opts: {
         {
           name: "organize_entities",
           description: "Assign extracted entities to projects, epics, and detect duplicates. Call this tool exactly once.",
-          input_schema: zodToJsonSchema(organizationResultSchema as any) as any,
+          input_schema: (() => { const { $schema, ...rest } = z.toJSONSchema(organizationResultSchema); return rest; })() as any,
         },
       ],
       tool_choice: { type: "tool", name: "organize_entities" },
