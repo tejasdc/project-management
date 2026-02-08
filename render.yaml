@@ -83,8 +83,9 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
 
-keyValues:
-  - name: pm-redis
+  # --- Redis (Valkey) ---
+  - type: keyvalue
+    name: pm-redis
     plan: starter
     region: oregon
     ipAllowList: []
