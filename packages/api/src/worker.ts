@@ -30,9 +30,9 @@ function getConcurrency(defaultValue: number) {
 }
 
 const workers = [
-  new Worker("notes:extract", notesExtractProcessor, { connection, concurrency: getConcurrency(5) }),
-  new Worker("entities:organize", entitiesOrganizeProcessor, { connection, concurrency: getConcurrency(5) }),
-  new Worker("notes:reprocess", notesReprocessProcessor, { connection, concurrency: getConcurrency(2) }),
+  new Worker("notes-extract", notesExtractProcessor, { connection, concurrency: getConcurrency(5) }),
+  new Worker("entities-organize", entitiesOrganizeProcessor, { connection, concurrency: getConcurrency(5) }),
+  new Worker("notes-reprocess", notesReprocessProcessor, { connection, concurrency: getConcurrency(2) }),
 ];
 
 for (const w of workers) wire(w);

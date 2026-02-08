@@ -65,7 +65,7 @@ export async function captureNote(opts: { input: CaptureNoteInput; capturedByUse
     } else {
       try {
         await queue.add(
-          "notes:extract",
+          "notes-extract",
           { rawNoteId: note.id },
           {
             ...DEFAULT_JOB_OPTS,
@@ -103,7 +103,7 @@ export async function markNoteForReprocess(opts: { rawNoteId: string; requestedB
 
   try {
     await queue.add(
-      "notes:reprocess",
+      "notes-reprocess",
       { rawNoteId, requestedByUserId },
       {
         ...DEFAULT_JOB_OPTS,

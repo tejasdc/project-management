@@ -261,7 +261,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
       const organizeQueue = getEntitiesOrganizeQueue();
       if (organizeQueue) {
         await organizeQueue.add(
-          "entities:organize",
+          "entities-organize",
           { rawNoteId, entityIds: createdEntityIds },
           {
             ...DEFAULT_JOB_OPTS,

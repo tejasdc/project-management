@@ -40,7 +40,7 @@ export async function notesReprocessProcessor(job: Job<NotesReprocessJob>) {
 
   try {
     await getNotesExtractQueue()!.add(
-      "notes:extract",
+      "notes-extract",
       { rawNoteId },
       {
         ...DEFAULT_JOB_OPTS,

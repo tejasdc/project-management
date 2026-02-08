@@ -58,23 +58,23 @@ let _entitiesComputeEmbeddings: Queue<EntitiesComputeEmbeddingsJob> | null | und
 let _reviewQueueExportTrainingData: Queue<ReviewQueueExportTrainingDataJob> | null | undefined;
 
 export function getNotesExtractQueue() {
-  if (_notesExtract === undefined) _notesExtract = lazyQueue("notes:extract");
+  if (_notesExtract === undefined) _notesExtract = lazyQueue("notes-extract");
   return _notesExtract;
 }
 export function getEntitiesOrganizeQueue() {
-  if (_entitiesOrganize === undefined) _entitiesOrganize = lazyQueue("entities:organize");
+  if (_entitiesOrganize === undefined) _entitiesOrganize = lazyQueue("entities-organize");
   return _entitiesOrganize;
 }
 export function getNotesReprocessQueue() {
-  if (_notesReprocess === undefined) _notesReprocess = lazyQueue("notes:reprocess");
+  if (_notesReprocess === undefined) _notesReprocess = lazyQueue("notes-reprocess");
   return _notesReprocess;
 }
 export function getEntitiesComputeEmbeddingsQueue() {
-  if (_entitiesComputeEmbeddings === undefined) _entitiesComputeEmbeddings = lazyQueue("entities:compute-embeddings");
+  if (_entitiesComputeEmbeddings === undefined) _entitiesComputeEmbeddings = lazyQueue("entities-compute-embeddings");
   return _entitiesComputeEmbeddings;
 }
 export function getReviewQueueExportTrainingDataQueue() {
-  if (_reviewQueueExportTrainingData === undefined) _reviewQueueExportTrainingData = lazyQueue("review-queue:export-training-data");
+  if (_reviewQueueExportTrainingData === undefined) _reviewQueueExportTrainingData = lazyQueue("review-queue-export-training-data");
   return _reviewQueueExportTrainingData;
 }
 
