@@ -23,7 +23,7 @@ services:
           name: pm-db
           property: connectionString
       - key: CORS_ORIGINS
-        value: "https://pm-web-xqnz.onrender.com"
+        value: "https://pm-web-xqnz.onrender.com,https://clarify.pm"
       - key: REDIS_URL
         fromService:
           type: keyvalue
