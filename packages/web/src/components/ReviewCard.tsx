@@ -72,6 +72,7 @@ interface Entity {
 interface ReviewCardProps {
   item: ReviewItem;
   entity?: Entity | null;
+  disabled?: boolean;
   onResolve: (args: {
     status: "accepted" | "rejected" | "modified";
     userResolution?: Record<string, unknown>;
@@ -774,7 +775,7 @@ function CreationActions({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ReviewCard({ item, entity, onResolve }: ReviewCardProps) {
+export function ReviewCard({ item, entity, disabled, onResolve }: ReviewCardProps) {
   const [showComment, setShowComment] = useState(false);
   const [trainingComment, setTrainingComment] = useState("");
   const [modifying, setModifying] = useState(false);
@@ -805,8 +806,9 @@ export function ReviewCard({ item, entity, onResolve }: ReviewCardProps) {
         "group rounded-[var(--radius-lg)] border-t-2 border border-[var(--border-subtle)]",
         "bg-[color-mix(in_oklab,var(--bg-secondary)_92%,black)]",
         "shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]",
-        "transition-all duration-150",
+        "transition-all duration-200",
         "hover:border-[var(--border-medium)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.25)]",
+        disabled ? "opacity-40 pointer-events-none scale-[0.98]" : "",
         borderClass,
       ].join(" ")}
     >

@@ -29,3 +29,6 @@ coverage/
 
 # Local workspace
 .workspace/
+
+# Database backups
+backups/

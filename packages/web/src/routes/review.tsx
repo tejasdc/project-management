@@ -229,7 +229,7 @@ function ReviewPage() {
     staleTime: 10_000,
   });
 
-  /* ---- Resolve mutation ---- */
+  /* ---- Resolve mutation (optimistic) ---- */
   const resolve = useMutation({
     mutationFn: async (args: {
       id: string;
@@ -247,11 +247,42 @@ function ReviewPage() {
       });
       return unwrapJson<any>(res);
     },
-    onSuccess: () => {
+    onMutate: async (args) => {
+      // Cancel in-flight refetches so they don't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: ["reviewQueue"] });
+
+      // Snapshot current cache for rollback
+      const prevQueue = qc.getQueryData(qk.reviewQueue(queryFilters));
+      const prevCount = qc.getQueryData(qk.reviewQueueCount({ status: "pending" }));
+
+      // Optimistically remove the item from the list
+      qc.setQueryData(qk.reviewQueue(queryFilters), (old: any) => {
+        if (!old?.items) return old;
+        return { ...old, items: old.items.filter((i: any) => i.id !== args.id) };
+      });
+
+      // Optimistically decrement the pending count
+      qc.setQueryData(qk.reviewQueueCount({ status: "pending" }), (old: any) => {
+        if (!old || typeof old.count !== "number") return old;
+        return { ...old, count: Math.max(0, old.count - 1) };
+      });
+
+      return { prevQueue, prevCount };
+    },
+    onError: (err, _args, context) => {
+      // Roll back on failure
+      if (context?.prevQueue) {
+        qc.setQueryData(qk.reviewQueue(queryFilters), context.prevQueue);
+      }
+      if (context?.prevCount) {
+        qc.setQueryData(qk.reviewQueueCount({ status: "pending" }), context.prevCount);
+      }
+      toast.error(err instanceof Error ? err.message : "Resolve failed");
+    },
+    onSettled: () => {
+      // Refetch to reconcile with server state
       void qc.invalidateQueries({ queryKey: ["reviewQueue"] });
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Resolve failed"),
   });
 
   /* ---- Sort items ---- */
@@ -465,6 +496,7 @@ function ReviewPage() {
                               <ReviewCard
                                 item={item}
                                 entity={entity}
+                                disabled={resolve.isPending && resolve.variables?.id === item.id}
                                 onResolve={(args) =>
                                   resolve.mutate({ id: item.id, ...args })
                                 }
