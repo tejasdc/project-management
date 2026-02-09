@@ -1,10 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../src/db/index.js";
 import { entities, epics, reviewQueue } from "../src/db/schema/index.js";
 import { resolveReviewItem } from "../src/services/review.js";
 import { createPendingReviewItem, createTestEntity, createTestProject, createTestUser } from "./factories.js";
+
+// Mock the queue module so ioredis never tries to connect to Redis.
+vi.mock("../src/jobs/queue.js", () => ({
+  getNotesExtractQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
+  getNotesReprocessQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
+  getEntitiesOrganizeQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
+  getEntitiesComputeEmbeddingsQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
+  getReviewQueueExportTrainingDataQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
+  DEFAULT_JOB_OPTS: { removeOnComplete: true, removeOnFail: 500 },
+  isRedisConfigured: () => false,
+  getRedisConnection: () => null,
+  getRedisConnectionOrThrow: () => { throw new Error("Redis not available in tests"); },
+}));
+
+// Mock SSE events to prevent ioredis connections from the event publisher.
+vi.mock("../src/services/events.js", () => ({
+  tryPublishEvent: vi.fn().mockResolvedValue(undefined),
+  publishEvent: vi.fn().mockResolvedValue(undefined),
+  onEvent: vi.fn().mockReturnValue(() => {}),
+  events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+}));
 
 describe("review resolution semantics", () => {
   it("type_classification change auto-rejects all other pending review items for the entity", async () => {

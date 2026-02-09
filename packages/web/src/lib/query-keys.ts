@@ -1,5 +1,5 @@
 export const qk = {
-  projects: () => ["projects"] as const,
+  projects: (filters?: Record<string, unknown>) => ["projects", filters ?? {}] as const,
   projectDashboard: (projectId: string) => ["projects", projectId, "dashboard"] as const,
   entities: (filters: Record<string, unknown>) => ["entities", filters] as const,
   entity: (entityId: string) => ["entities", entityId] as const,

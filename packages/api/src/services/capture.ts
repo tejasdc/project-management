@@ -16,8 +16,15 @@ export type CaptureNoteInput = {
 };
 
 function isUniqueViolation(err: unknown) {
-  // postgres-js throws PostgresError with a string code like "23505".
-  return typeof err === "object" && err !== null && "code" in err && (err as any).code === "23505";
+  // Check both the error itself and its cause for the Postgres unique violation code.
+  // Drizzle v0.45+ wraps the original Postgres error in a DrizzleQueryError,
+  // so the code "23505" may be on err.cause rather than err directly.
+  if (typeof err !== "object" || err === null) return false;
+  if ("code" in err && (err as any).code === "23505") return true;
+  if ("cause" in err && typeof (err as any).cause === "object" && (err as any).cause !== null) {
+    return (err as any).cause.code === "23505";
+  }
+  return false;
 }
 
 export async function captureNote(opts: { input: CaptureNoteInput; capturedByUserId: string }) {
