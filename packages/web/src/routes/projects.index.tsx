@@ -21,7 +21,7 @@ import {
 
 const createAnyFileRoute = createFileRoute as any;
 
-export const Route = createAnyFileRoute("/projects")({
+export const Route = createAnyFileRoute("/projects/")({
   component: ProjectsPage,
   errorComponent: RouteError,
 });
