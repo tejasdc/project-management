@@ -190,47 +190,6 @@ export function createApp() {
     }
   });
 
-  // ── TEMPORARY: one-time data cleanup endpoint (remove after use) ──
-  base.post("/api/admin/clean-test-data", async (c) => {
-    const token = c.req.query("token");
-    if (token !== "clean-prod-2026-02-09") {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const tablesToTruncate = [
-      "review_queue",
-      "entity_events",
-      "entity_sources",
-      "entity_relationships",
-      "entity_tags",
-      "entities",
-      "epics",
-      "raw_notes",
-      "tags",
-      "projects",
-    ];
-
-    const results: Record<string, string> = {};
-    for (const table of tablesToTruncate) {
-      try {
-        await db.execute(dsql.raw(`TRUNCATE TABLE ${table} CASCADE`));
-        results[table] = "truncated";
-      } catch (err) {
-        results[table] = `error: ${err instanceof Error ? err.message : String(err)}`;
-      }
-    }
-
-    // Verify
-    const counts: Record<string, number> = {};
-    for (const table of [...tablesToTruncate, "users", "api_keys"]) {
-      const res = await db.execute(dsql.raw(`SELECT count(*) as cnt FROM ${table}`));
-      counts[table] = Number((res.rows[0] as { cnt: string }).cnt);
-    }
-
-    return c.json({ status: "done", results, postCleanupCounts: counts });
-  });
-  // ── END TEMPORARY ──
-
   // Public routes
   const withHealth = base.get("/api/health", async (c) => {
     const [dbRes, redisRes] = await Promise.all([checkDb(), checkRedis()]);
