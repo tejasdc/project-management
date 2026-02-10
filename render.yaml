@@ -40,7 +40,7 @@ services:
     staticPublishPath: ./packages/web/dist
     envVars:
       - key: VITE_API_URL
-        value: "https://pm-api-lxwo.onrender.com"
+        value: "https://api.clarify.pm"
     buildFilter:
       paths:
         - "packages/web/**"
