@@ -124,6 +124,16 @@ export function Header() {
             >
               API key
             </button>
+            <button
+              onClick={() => {
+                setApiKey("");
+                toast.message("Logged out");
+              }}
+              className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-medium)] hover:text-[var(--text-primary)]"
+              title="Log out"
+            >
+              Log out
+            </button>
           </div>
         </div>
       </header>
