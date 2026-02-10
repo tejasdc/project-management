@@ -7,11 +7,12 @@ import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
 import { apiKeys, users } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
-import { generateApiKey } from "../services/auth.js";
+import { generateApiKey, hashPassword, verifyPassword } from "../services/auth.js";
 
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email().max(255),
+  password: z.string().min(8).max(128),
 });
 
 const createApiKeySchema = z.object({
@@ -22,6 +23,11 @@ const apiKeyIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const loginSchema = z.object({
+  email: z.string().email().max(255),
+  password: z.string().min(1),
+});
+
 export const authRoutes = new Hono<AppEnv>()
   .post(
     "/register",
@@ -29,7 +35,8 @@ export const authRoutes = new Hono<AppEnv>()
       if (!result.success) throw result.error;
     }),
     async (c) => {
-      const { name, email } = c.req.valid("json");
+      const { name, email: rawEmail, password } = c.req.valid("json");
+      const email = rawEmail.trim().toLowerCase();
 
       // Check if email already taken
       const existing = await db.query.users.findFirst({
@@ -42,9 +49,11 @@ export const authRoutes = new Hono<AppEnv>()
         );
       }
 
+      const pwHash = await hashPassword(password);
+
       const [user] = await db
         .insert(users)
-        .values({ name, email })
+        .values({ name, email, passwordHash: pwHash })
         .returning();
 
       const { plaintextKey, keyHash } = await generateApiKey();
@@ -56,6 +65,44 @@ export const authRoutes = new Hono<AppEnv>()
       });
 
       return c.json({ user: { id: user!.id, name: user!.name, email: user!.email }, apiKey: plaintextKey }, 201);
+    }
+  )
+  .post(
+    "/login",
+    zValidator("json", loginSchema, (result) => {
+      if (!result.success) throw result.error;
+    }),
+    async (c) => {
+      const { email, password } = c.req.valid("json");
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const user = await db.query.users.findFirst({
+        where: (t, q) => eq(t.email, normalizedEmail),
+      });
+
+      // Return the same error for all auth failures to prevent account enumeration
+      const invalidCredentials = () =>
+        c.json(
+          { error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password", status: 401 } },
+          401 as const,
+        );
+
+      if (!user) return invalidCredentials();
+      if (!user.passwordHash) return invalidCredentials();
+
+      const valid = await verifyPassword(password, user.passwordHash);
+      if (!valid) return invalidCredentials();
+
+      // Generate a fresh API key for the user
+      const { plaintextKey, keyHash } = await generateApiKey();
+
+      await db.insert(apiKeys).values({
+        userId: user.id,
+        name: "login",
+        keyHash,
+      });
+
+      return c.json({ user: { id: user.id, name: user.name, email: user.email }, apiKey: plaintextKey });
     }
   )
   .get("/me", (c) => {

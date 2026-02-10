@@ -3,7 +3,7 @@ export function ConfidenceBadge(props: { value: number | null | undefined }) {
   const pct = v === null ? "—" : `${Math.round(v * 100)}%`;
 
   const tone =
-    v === null ? "neutral" : v >= 0.9 ? "high" : v >= 0.7 ? "medium" : "low";
+    v === null ? "neutral" : v >= 0.7 ? "high" : v >= 0.5 ? "medium" : "low";
 
   const styles =
     tone === "high"

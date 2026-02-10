@@ -103,6 +103,7 @@ const ENTITY_BADGE_CLASSES: Record<EntityType, string> = {
 };
 
 function prettyReviewType(t: string): string {
+  if (t === "low_confidence") return "Needs Review";
   return t
     .split("_")
     .map((p) => p[0]!.toUpperCase() + p.slice(1))
@@ -110,19 +111,19 @@ function prettyReviewType(t: string): string {
 }
 
 function confidenceColor(v: number): string {
-  if (v > 0.8) return "var(--confidence-high)";
+  if (v >= 0.7) return "var(--confidence-high)";
   if (v >= 0.5) return "var(--confidence-medium)";
   return "var(--confidence-low)";
 }
 
 function confidenceBarBg(v: number): string {
-  if (v > 0.8) return "bg-[var(--confidence-high)]";
+  if (v >= 0.7) return "bg-[var(--confidence-high)]";
   if (v >= 0.5) return "bg-[var(--confidence-medium)]";
   return "bg-[var(--confidence-low)]";
 }
 
 function confidenceTextColor(v: number): string {
-  if (v > 0.8) return "text-[var(--confidence-high)]";
+  if (v >= 0.7) return "text-[var(--confidence-high)]";
   if (v >= 0.5) return "text-[var(--confidence-medium)]";
   return "text-[var(--confidence-low)]";
 }

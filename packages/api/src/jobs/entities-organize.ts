@@ -270,82 +270,133 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
         }
       }
 
-      // Epic creation suggestions are project-scoped review items.
+      // Epic creation suggestions — auto-create if confident, otherwise review.
       for (const s of org.result.epicSuggestions) {
         const candidateEntityIds = (s.entityIndices ?? [])
           .map((idx) => entityIds[idx])
           .filter(Boolean);
 
-        const [row] = await tx
-          .insert(reviewQueue)
-          .values({
-            projectId: s.projectId,
-            reviewType: "epic_creation",
-            status: "pending",
-            aiSuggestion: {
-              proposedEpicName: s.name,
-              proposedEpicDescription: s.description,
-              proposedEpicProjectId: s.projectId,
-              candidateEntityIds,
-              explanation: s.reason,
-            } as any,
-            aiConfidence: (s as any).confidence ?? 0.85,
-          })
-          .onConflictDoNothing()
-          .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
-        if (row) createdReviewItems.push(row);
+        const epicConfidence = s.confidence ?? 0.85;
+
+        if (epicConfidence >= CONFIDENCE_THRESHOLD && s.projectId && candidateEntityIds.length > 0) {
+          // Auto-create epic and assign candidate entities directly
+          const [newEpic] = await tx
+            .insert(epics)
+            .values({
+              projectId: s.projectId,
+              name: s.name,
+              description: s.description,
+              createdBy: "ai_suggestion",
+            } as any)
+            .returning({ id: epics.id });
+
+          if (newEpic?.id) {
+            for (const eid of candidateEntityIds) {
+              await tx
+                .update(entities)
+                .set({ epicId: newEpic.id, projectId: s.projectId, updatedAt: new Date() })
+                .where(eq(entities.id, eid));
+              updatedEntityIds.push(eid);
+            }
+          }
+
+          log.info({ epicId: newEpic?.id, name: s.name, confidence: epicConfidence }, "auto-created epic");
+        } else {
+          const [row] = await tx
+            .insert(reviewQueue)
+            .values({
+              projectId: s.projectId,
+              reviewType: "epic_creation",
+              status: "pending",
+              aiSuggestion: {
+                proposedEpicName: s.name,
+                proposedEpicDescription: s.description,
+                proposedEpicProjectId: s.projectId,
+                candidateEntityIds,
+                explanation: s.reason,
+              } as any,
+              aiConfidence: epicConfidence,
+            })
+            .onConflictDoNothing()
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
+        }
       }
 
-      // Project creation suggestions — entity-scoped review items.
+      // Project creation suggestions — auto-create if confident, otherwise review.
       for (const s of org.result.projectSuggestions) {
         const candidateEntityIds = (s.entityIndices ?? [])
           .map((idx) => entityIds[idx])
           .filter(Boolean);
 
-        // Use the first candidate entity to satisfy the entity_or_project CHECK constraint
-        const anchorEntityId = candidateEntityIds[0] ?? null;
-        if (!anchorEntityId) continue;
+        const projectConfidence = s.confidence ?? 0.85;
 
-        // Deduplicate: skip if a project with this name already exists
+        // Deduplicate: skip if a project with this name already exists (case-insensitive exact match)
         const existingProject = await tx.query.projects.findFirst({
           where: (t, { and, isNull }) => and(
-            ilike(t.name, s.name),
+            sql`lower(${t.name}) = lower(${s.name})`,
             isNull(t.deletedAt),
           ),
         });
         if (existingProject) continue;
 
-        // Deduplicate: skip if a pending project_creation review item already proposes this name
-        const existingReview = await tx
-          .select({ id: reviewQueue.id })
-          .from(reviewQueue)
-          .where(
-            and(
-              eq(reviewQueue.reviewType, "project_creation"),
-              eq(reviewQueue.status, "pending"),
-              sql`${reviewQueue.aiSuggestion}->>'proposedProjectName' ILIKE ${s.name}`,
-            )
-          )
-          .limit(1);
-        if (existingReview.length > 0) continue;
+        // Skip auto-create if no candidate entities — don't create orphan projects
+        if (projectConfidence >= CONFIDENCE_THRESHOLD && candidateEntityIds.length > 0) {
+          // Auto-create project and assign candidate entities directly
+          const [newProject] = await tx
+            .insert(projects)
+            .values({ name: s.name, description: s.description })
+            .returning({ id: projects.id });
 
-        const [row] = await tx
-          .insert(reviewQueue)
-          .values({
-            entityId: anchorEntityId,
-            reviewType: "project_creation",
-            status: "pending",
-            aiSuggestion: {
-              proposedProjectName: s.name,
-              proposedProjectDescription: s.description,
-              candidateEntityIds,
-              explanation: s.reason,
-            } as any,
-            aiConfidence: s.confidence ?? 0.85,
-          })
-          .onConflictDoNothing()
-          .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
-        if (row) createdReviewItems.push(row);
+          if (newProject?.id) {
+            for (const eid of candidateEntityIds) {
+              await tx
+                .update(entities)
+                .set({ projectId: newProject.id, updatedAt: new Date() })
+                .where(eq(entities.id, eid));
+              updatedEntityIds.push(eid);
+              updatedProjectIds.add(newProject.id);
+            }
+          }
+
+          log.info({ projectId: newProject?.id, name: s.name, confidence: projectConfidence }, "auto-created project");
+        } else {
+          // Use the first candidate entity to satisfy the entity_or_project CHECK constraint
+          const anchorEntityId = candidateEntityIds[0] ?? null;
+          if (!anchorEntityId) continue;
+
+          // Deduplicate: skip if a pending project_creation review item already proposes this name
+          const existingReview = await tx
+            .select({ id: reviewQueue.id })
+            .from(reviewQueue)
+            .where(
+              and(
+                eq(reviewQueue.reviewType, "project_creation"),
+                eq(reviewQueue.status, "pending"),
+                sql`${reviewQueue.aiSuggestion}->>'proposedProjectName' ILIKE ${s.name}`,
+              )
+            )
+            .limit(1);
+          if (existingReview.length > 0) continue;
+
+          const [row] = await tx
+            .insert(reviewQueue)
+            .values({
+              entityId: anchorEntityId,
+              reviewType: "project_creation",
+              status: "pending",
+              aiSuggestion: {
+                proposedProjectName: s.name,
+                proposedProjectDescription: s.description,
+                candidateEntityIds,
+                explanation: s.reason,
+              } as any,
+              aiConfidence: projectConfidence,
+            })
+            .onConflictDoNothing()
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+          if (row) createdReviewItems.push(row);
+        }
       }
     });
 

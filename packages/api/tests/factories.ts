@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { db } from "../src/db/index.js";
-import { apiKeys, entities, projects, rawNotes, reviewQueue, users } from "../src/db/schema/index.js";
-import { generateApiKey, hashApiKey } from "../src/services/auth.js";
+import { apiKeys, entities, epics, projects, rawNotes, reviewQueue, users } from "../src/db/schema/index.js";
+import { generateApiKey, hashApiKey, hashPassword } from "../src/services/auth.js";
 
 export async function createTestUser(overrides?: Partial<typeof users.$inferInsert>) {
   const [row] = await db
@@ -10,6 +10,23 @@ export async function createTestUser(overrides?: Partial<typeof users.$inferInse
     .values({
       name: "Test User",
       email: `test-${randomUUID()}@example.com`,
+      ...overrides,
+    })
+    .returning();
+  return row!;
+}
+
+export async function createTestUserWithPassword(
+  plaintextPassword: string,
+  overrides?: Partial<typeof users.$inferInsert>
+) {
+  const pwHash = await hashPassword(plaintextPassword);
+  const [row] = await db
+    .insert(users)
+    .values({
+      name: "Test User",
+      email: `test-${randomUUID()}@example.com`,
+      passwordHash: pwHash,
       ...overrides,
     })
     .returning();
@@ -76,6 +93,19 @@ export async function createTestApiKey(opts: { userId: string; name?: string; pl
     .returning();
 
   return { apiKey: row!, plaintextKey };
+}
+
+export async function createTestEpic(overrides: Partial<typeof epics.$inferInsert> & { projectId: string }) {
+  const [row] = await db
+    .insert(epics)
+    .values({
+      name: `Test Epic ${randomUUID().slice(0, 8)}`,
+      description: null,
+      createdBy: "user",
+      ...overrides,
+    } as any)
+    .returning();
+  return row!;
 }
 
 export async function createPendingReviewItem(overrides: Partial<typeof reviewQueue.$inferInsert>) {

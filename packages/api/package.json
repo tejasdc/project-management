@@ -29,6 +29,8 @@
     "@hono/zod-validator": "^0.7.6",
     "@neondatabase/serverless": "^1.0.2",
     "@pm/shared": "workspace:*",
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
     "bullmq": "^5.67.3",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
@@ -45,6 +47,7 @@
     "@types/node": "^22.19.10",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
+    "testcontainers": "^11.11.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"

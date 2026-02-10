@@ -55,7 +55,7 @@ export function Sidebar() {
           Navigation
         </div>
         <div className="mt-1 text-xs text-[var(--text-tertiary)]">
-          Review low-confidence calls before they fossilize.
+          Review below-threshold items before they fossilize.
         </div>
       </div>
       <nav className="space-y-1 p-2">

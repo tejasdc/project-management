@@ -42,4 +42,4 @@ export const REVIEW_STATUSES = [
 ] as const;
 export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
-export const CONFIDENCE_THRESHOLD = 0.9;
+export const CONFIDENCE_THRESHOLD = 0.7;

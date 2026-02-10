@@ -7,7 +7,7 @@ import { unauthorized } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { validateApiKey } from "../services/auth.js";
 
-const PUBLIC_PATHS = new Set(["/api/health", "/api/auth/register"]);
+const PUBLIC_PATHS = new Set(["/api/health", "/api/auth/register", "/api/auth/login"]);
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   if (PUBLIC_PATHS.has(c.req.path)) {

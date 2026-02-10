@@ -1,10 +1,21 @@
 import { randomBytes, webcrypto } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 import { db } from "../db/index.js";
 import { apiKeys, users } from "../db/schema/index.js";
 
 const { subtle } = webcrypto;
+
+const BCRYPT_ROUNDS = 12;
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
 
 export async function generateApiKey() {
   const hex = randomBytes(16).toString("hex"); // 32 hex chars

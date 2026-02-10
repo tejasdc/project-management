@@ -45,6 +45,7 @@ const REVIEW_ORDER: Record<string, number> = {
 
 /** Human-readable label for review types. */
 function prettyReviewType(t: string) {
+  if (t === "low_confidence") return "Needs Review";
   return t
     .split("_")
     .map((p) => p[0]!.toUpperCase() + p.slice(1))
@@ -72,7 +73,7 @@ const REVIEW_TYPE_OPTIONS = [
   { value: "epic_assignment", label: "Epic Assignment" },
   { value: "epic_creation", label: "Epic Creation" },
   { value: "duplicate_detection", label: "Duplicate Detection" },
-  { value: "low_confidence", label: "Low Confidence" },
+  { value: "low_confidence", label: "Needs Review" },
   { value: "assignee_suggestion", label: "Assignee Suggestion" },
 ];
 
@@ -333,7 +334,7 @@ function ReviewPage() {
         ) : null}
       </div>
       <p className="mt-1 max-w-[80ch] text-sm text-[var(--text-secondary)]">
-        Low-confidence fields get quarantined here. Resolve them once. Teach the system quietly.
+        Below-threshold items get quarantined here. Resolve them once. Teach the system quietly.
       </p>
 
       {/* ================================================================
