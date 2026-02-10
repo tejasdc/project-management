@@ -149,8 +149,8 @@ export function ProjectCard(props: ProjectCardProps) {
             </div>
             <MiniBar
               segments={[
-                { color: "var(--accent-insight)", value: done },
-                { color: "var(--accent-decision)", value: inProgress },
+                { color: "var(--accent-task)", value: done },
+                { color: "var(--accent-task)", value: inProgress },
                 { color: "var(--accent-task)", value: needsAction },
                 { color: "#6b7189", value: captured },
               ]}
@@ -176,8 +176,8 @@ export function ProjectCard(props: ProjectCardProps) {
             </div>
             <MiniBar
               segments={[
-                { color: "var(--accent-insight)", value: decidedDecisions },
-                { color: "var(--accent-task)", value: pendingDecisions },
+                { color: "var(--accent-decision)", value: decidedDecisions },
+                { color: "#6b7189", value: pendingDecisions },
               ]}
             />
             <div className="mt-1.5 space-y-0">
