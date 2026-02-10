@@ -31,16 +31,37 @@ function StatDot(props: { color: string }) {
   );
 }
 
-function StatRow(props: { color: string; label: string; count: number }) {
+function StatItem(props: { label: string; count: number }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-[2px]">
-      <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)]">
-        <StatDot color={props.color} />
+    <div className="flex items-center justify-between gap-2 py-[1px]">
+      <span className="text-[11px] text-[var(--text-tertiary)]">
         {props.label}
       </span>
-      <span className="font-[var(--font-mono)] text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
+      <span className="font-[var(--font-mono)] text-[11px] tabular-nums text-[var(--text-secondary)]">
         {props.count}
       </span>
+    </div>
+  );
+}
+
+function MiniBar(props: { segments: { color: string; value: number }[] }) {
+  const total = props.segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) return <div className="h-[3px] rounded-full bg-[var(--border-subtle)]" />;
+  return (
+    <div className="flex h-[3px] gap-[1px] overflow-hidden rounded-full">
+      {props.segments.map((seg, i) =>
+        seg.value > 0 ? (
+          <div
+            key={i}
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              backgroundColor: seg.color,
+              width: `${(seg.value / total) * 100}%`,
+              opacity: 0.7,
+            }}
+          />
+        ) : null,
+      )}
     </div>
   );
 }
@@ -117,38 +138,72 @@ export function ProjectCard(props: ProjectCardProps) {
         <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
           {/* Tasks column */}
           <div className="p-2.5">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
-              <StatDot color="var(--accent-task)" />
-              Tasks
+            <div className="mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                <StatDot color="var(--accent-task)" />
+                Tasks
+              </span>
+              <span className="font-[var(--font-mono)] text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                {captured + needsAction + inProgress + done}
+              </span>
             </div>
-            <div className="space-y-0.5">
-              <StatRow color="#6b7189" label="Captured" count={captured} />
-              <StatRow color="var(--accent-task)" label="Needs action" count={needsAction} />
-              <StatRow color="var(--accent-decision)" label="In progress" count={inProgress} />
-              <StatRow color="var(--accent-insight)" label="Done" count={done} />
+            <MiniBar
+              segments={[
+                { color: "var(--accent-insight)", value: done },
+                { color: "var(--accent-decision)", value: inProgress },
+                { color: "var(--accent-task)", value: needsAction },
+                { color: "#6b7189", value: captured },
+              ]}
+            />
+            <div className="mt-1.5 space-y-0">
+              <StatItem label="Captured" count={captured} />
+              <StatItem label="Needs action" count={needsAction} />
+              <StatItem label="In progress" count={inProgress} />
+              <StatItem label="Done" count={done} />
             </div>
           </div>
 
           {/* Decisions column */}
           <div className="p-2.5">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
-              <StatDot color="var(--accent-decision)" />
-              Decisions
+            <div className="mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                <StatDot color="var(--accent-decision)" />
+                Decisions
+              </span>
+              <span className="font-[var(--font-mono)] text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                {pendingDecisions + decidedDecisions}
+              </span>
             </div>
-            <div className="space-y-0.5">
-              <StatRow color="var(--accent-task)" label="Pending" count={pendingDecisions} />
-              <StatRow color="var(--accent-insight)" label="Decided" count={decidedDecisions} />
+            <MiniBar
+              segments={[
+                { color: "var(--accent-insight)", value: decidedDecisions },
+                { color: "var(--accent-task)", value: pendingDecisions },
+              ]}
+            />
+            <div className="mt-1.5 space-y-0">
+              <StatItem label="Pending" count={pendingDecisions} />
+              <StatItem label="Decided" count={decidedDecisions} />
             </div>
           </div>
 
           {/* Insights column */}
           <div className="p-2.5">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
-              <StatDot color="var(--accent-insight)" />
-              Insights
+            <div className="mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+                <StatDot color="var(--accent-insight)" />
+                Insights
+              </span>
+              <span className="font-[var(--font-mono)] text-[11px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                {recentInsights}
+              </span>
             </div>
-            <div className="space-y-0.5">
-              <StatRow color="var(--accent-insight)" label="Total" count={recentInsights} />
+            <MiniBar
+              segments={[
+                { color: "var(--accent-insight)", value: recentInsights },
+              ]}
+            />
+            <div className="mt-1.5 space-y-0">
+              <StatItem label="Total" count={recentInsights} />
             </div>
           </div>
         </div>
