@@ -9,6 +9,7 @@ import { epics } from "../db/schema/index.js";
 import { epicInsertSchema } from "../db/validation.js";
 import { notFound } from "../lib/errors.js";
 import { decodeCursor, encodeCursor, parseLimit, parseOptionalBoolean } from "../lib/pagination.js";
+import { tryPublishEvent } from "../services/events.js";
 
 const listEpicsQuerySchema = z.object({
   projectId: z.string().uuid(),
@@ -74,6 +75,7 @@ export const epicRoutes = new Hono<AppEnv>()
     async (c) => {
       const data = c.req.valid("json");
       const [epic] = await db.insert(epics).values(data as any).returning();
+      await tryPublishEvent("epic:created", { id: epic.id, projectId: epic.projectId });
       return c.json({ epic }, 201);
     }
   )
@@ -90,6 +92,7 @@ export const epicRoutes = new Hono<AppEnv>()
       const patch = c.req.valid("json");
       const [epic] = await db.update(epics).set(patch as any).where(eq(epics.id, id)).returning();
       if (!epic) throw notFound("epic", id);
+      await tryPublishEvent("epic:updated", { id: epic.id, projectId: epic.projectId });
       return c.json({ epic });
     }
   );

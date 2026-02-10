@@ -149,6 +149,8 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
     const updatedEntityIds: string[] = [];
     const updatedProjectIds = new Set<string>();
     const createdReviewItems: Array<{ id: string; entityId: string | null; projectId: string | null; reviewType: string; status: string }> = [];
+    const createdProjects: Array<{ id: string; name: string }> = [];
+    const createdEpics: Array<{ id: string; projectId: string; name: string }> = [];
 
     await db.transaction(async (tx) => {
       for (const o of org.result.entityOrganizations) {
@@ -291,6 +293,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
             .returning({ id: epics.id });
 
           if (newEpic?.id) {
+            createdEpics.push({ id: newEpic.id, projectId: s.projectId, name: s.name });
             for (const eid of candidateEntityIds) {
               await tx
                 .update(entities)
@@ -349,6 +352,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
             .returning({ id: projects.id });
 
           if (newProject?.id) {
+            createdProjects.push({ id: newProject.id, name: s.name });
             for (const eid of candidateEntityIds) {
               await tx
                 .update(entities)
@@ -409,6 +413,12 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
     }
     for (const projectId of Array.from(updatedProjectIds)) {
       await tryPublishEvent("project:stats_updated", { projectId });
+    }
+    for (const p of createdProjects) {
+      await tryPublishEvent("project:created", { id: p.id, name: p.name });
+    }
+    for (const e of createdEpics) {
+      await tryPublishEvent("epic:created", { id: e.id, projectId: e.projectId, name: e.name });
     }
   } catch (err) {
     log.error({ err, rawNoteId }, "entities:organize failed");

@@ -76,6 +76,30 @@ export function SseProvider() {
         if (projectId) void qc.invalidateQueries({ queryKey: ["projects", projectId, "dashboard"] });
         return;
       }
+
+      if (eventType === "project:created" || eventType === "project:updated") {
+        void qc.invalidateQueries({ queryKey: ["projects"] });
+        const projectId = payload?.data?.id ?? payload?.data?.projectId;
+        if (projectId) {
+          void qc.invalidateQueries({ queryKey: ["projects", projectId] });
+        }
+        return;
+      }
+
+      if (eventType === "epic:created" || eventType === "epic:updated") {
+        void qc.invalidateQueries({ queryKey: ["projects"] });
+        void qc.invalidateQueries({ queryKey: ["epics"] });
+        const projectId = payload?.data?.projectId;
+        if (projectId) {
+          void qc.invalidateQueries({ queryKey: ["projects", projectId] });
+        }
+        return;
+      }
+
+      if (eventType === "raw_note:created") {
+        void qc.invalidateQueries({ queryKey: ["notes"] });
+        return;
+      }
     };
 
     const connect = () => {
@@ -99,7 +123,12 @@ export function SseProvider() {
         "entity:updated",
         "entity:event_added",
         "raw_note:processed",
+        "raw_note:created",
         "project:stats_updated",
+        "project:created",
+        "project:updated",
+        "epic:created",
+        "epic:updated",
       ] as const;
 
       for (const t of allEvents) {

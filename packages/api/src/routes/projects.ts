@@ -7,6 +7,7 @@ import { projectInsertSchema } from "../db/validation.js";
 import { notFound } from "../lib/errors.js";
 import { parseLimit, parseOptionalBoolean } from "../lib/pagination.js";
 import { createProject, getProjectDashboard, listProjects, patchProject } from "../services/projects.js";
+import { tryPublishEvent } from "../services/events.js";
 
 const projectIdParamsSchema = z.object({
   id: z.string().uuid(),
@@ -49,6 +50,7 @@ export const projectRoutes = new Hono<AppEnv>()
     async (c) => {
       const data = c.req.valid("json");
       const project = await createProject(data as any);
+      await tryPublishEvent("project:created", { id: project.id });
       return c.json({ project }, 201);
     }
   )
@@ -64,6 +66,7 @@ export const projectRoutes = new Hono<AppEnv>()
       const { id } = c.req.valid("param");
       const patch = c.req.valid("json");
       const project = await patchProject({ id, patch: patch as any });
+      await tryPublishEvent("project:updated", { id });
       return c.json({ project });
     }
   )

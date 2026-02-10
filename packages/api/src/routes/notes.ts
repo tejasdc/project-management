@@ -10,6 +10,7 @@ import { rawNotes } from "../db/schema/index.js";
 import { notFound } from "../lib/errors.js";
 import { decodeCursor, encodeCursor, parseLimit, parseOptionalBoolean } from "../lib/pagination.js";
 import { captureNote, markNoteForReprocess } from "../services/capture.js";
+import { tryPublishEvent } from "../services/events.js";
 import { tier2ApiKeyCaptureLimiter } from "../middleware/rate-limit.js";
 
 const noteIdParamsSchema = z.object({
@@ -43,6 +44,10 @@ export const noteRoutes = new Hono<AppEnv>()
         input,
         capturedByUserId: user.id,
       });
+
+      if (!res.deduped) {
+        await tryPublishEvent("raw_note:created", { id: res.note.id });
+      }
 
       return c.json(
         { note: res.note, deduped: res.deduped },
