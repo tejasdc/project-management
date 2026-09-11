@@ -111,8 +111,17 @@ recreates deleted resources on sync. Leave `render.yaml` unchanged and do not sy
 until database recovery/replacement is decided. The homepage uses the existing frontend
 configuration and does not need a Blueprint change.
 
-Retire the temporary preview after the Render homepage is verified. Never publish the
-repository root: it contains private code and operational documentation.
+The temporary Pages project was deleted after the Render homepage passed live checks
+on September 11; a subsequent Pages API lookup confirmed the project no longer exists.
+Never publish the repository root: it contains private code and operational documentation.
+
+The existing Render frontend deployed commit `e134ed170761f8ecf986d99a7d9a78d918a62204`
+as `dep-dai91hu743jc73e73qog`. `https://clarify.pm/` returns the new homepage, and
+`www.clarify.pm` redirects to it. Chromium and WebKit on Linux passed at 1440×1000 and
+390×844, both color schemes, including keyboard example interaction and no homepage
+API requests/storage writes. Direct project/entity/review/settings URLs retain the
+login gate in both engines. These checks do not establish working login or extraction:
+database recovery and the suspended Redis/worker remain unresolved.
 
 Docs-only and preparation commits use `[skip render]` until the actual deployment is
 inspected; this is Render's documented
