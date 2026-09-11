@@ -145,7 +145,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <CardContent className="flex flex-col gap-5 p-6">
           <div className="flex flex-col gap-1 text-center">
             <h1 className="font-[var(--font-display)] text-2xl font-extrabold tracking-[-0.02em]">
-              PM Agent
+              Clarify.pm
             </h1>
           </div>
 

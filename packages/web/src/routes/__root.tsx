@@ -1,4 +1,5 @@
-import { createRootRoute } from "@tanstack/react-router";
+import { createRootRoute, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { AppShell } from "../components/layout/AppShell";
@@ -6,6 +7,7 @@ import { AuthGate } from "../components/AuthGate";
 import { SseProvider } from "../components/SseProvider";
 import { QuickCapture } from "../components/QuickCapture";
 import { Sonner } from "../components/ui/Sonner";
+import { Homepage } from "../components/Homepage";
 
 function shouldRetry(err: unknown) {
   const status =
@@ -57,8 +59,16 @@ export function RouteError(props: { error: unknown }) {
 }
 
 function RootComponent() {
+  const isHomepage = useRouterState({ select: state => state.location.pathname === "/" });
+  useEffect(() => {
+    document.title = isHomepage ? "Clarify.pm — Your notes, with a next step." : "Clarify.pm — Workspace";
+  }, [isHomepage]);
+  if (isHomepage) return <Homepage />;
   return (
     <QueryClientProvider client={queryClient}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       <AuthGate>
         <SseProvider />
         <AppShell />

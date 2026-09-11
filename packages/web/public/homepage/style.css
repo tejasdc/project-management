@@ -1,5 +1,5 @@
-@font-face{font-family:Bricolage;src:url('/assets/bricolage-600.ttf') format('truetype');font-style:normal;font-weight:600;font-display:swap}
-@font-face{font-family:DM Sans;src:url('/assets/dm-sans-400.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:Bricolage;src:url('/homepage/assets/bricolage-600.ttf') format('truetype');font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:DM Sans;src:url('/homepage/assets/dm-sans-400.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
 :root{color-scheme:dark;--bg:#0c0e14;--surface:#13161f;--text:#e8eaf0;--muted:#a9afc1;--border:#303644;--accent:#edb650;--task:#edb650;--decision:#86b6fc;--insight:#6ecfb1;--mark:#edb65022;--selected:#edb650}
 *{box-sizing:border-box}
 html{scroll-padding-top:28px}

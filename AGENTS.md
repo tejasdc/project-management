@@ -16,18 +16,23 @@ wordmarks, and descriptions. Do not shorten it to "Clarify" (Tejas, 2026-09-11).
 `https://clarify.pm/`. The Cloudflare migration is canceled.** The portfolio must link
 to that domain, never the temporary Pages URL.
 
-`landing/` contains the prepared marketing homepage (plain HTML/CSS/JS and self-hosted
-fonts). Its example is explicitly illustrative and never calls the API. It was published
-temporarily as `clarify-homepage.pages.dev`; that is not the intended hosting target.
-Render publication is pending access to the workspace owning the existing `pm-*`
-resources. Inspect the actual `pm-web` settings before integrating the homepage, and
-preserve the authenticated app's routes. Do not create a replacement backend or database.
-Hosting evidence and access requirements: `docs/clarify-hosting.md`.
+`packages/web/src/components/Homepage.tsx` is the public homepage; its assets live in
+`packages/web/public/homepage/`. Its example is illustrative and never calls the API.
+The root route renders it outside AuthGate; every app route retains the existing gate
+and providers. Render's existing `/*` → `/index.html` rewrite, build command, publish
+directory, and package build filter are unchanged. Do not publish the repository root.
 
-Until the existing Render deployment is inspected, use `[skip render]` for docs-only
-or preparation commits. Do not treat a Git push as proof of a Render deploy.
-Preview locally with `python3 -m http.server 14389 --bind 127.0.0.1 --directory landing`
-(choose another free port for concurrent previews).
+The Render credential is `~/.config/render/clarify.env` (mode 600). Existing service:
+`srv-d63tlvhr0fns73bsb560`, with verified `clarify.pm`/`www.clarify.pm` domains. Deploy
+only this frontend while the configured Postgres resource is unresolved and the
+Redis/worker services are suspended. See `docs/clarify-hosting.md` for evidence,
+deployment, and rollback. The homepage's offline notice stays until live app acceptance
+passes. A Git push or frontend HTTP 200 does not prove backend health.
+
+The existing Render Blueprint auto-syncs `render.yaml` and still declares the missing
+database. Do not change or sync that Blueprint until database recovery/replacement is
+decided: Render can recreate a deleted Blueprint resource. The homepage needs no
+infrastructure configuration change. Preview with `corepack pnpm --filter @pm/web dev`.
 
 ## Worktree setup
 

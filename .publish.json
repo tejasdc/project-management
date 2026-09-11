@@ -1,0 +1,16 @@
+{
+  "slug": "clarify",
+  "title": "Clarify.pm",
+  "desc": "What if project management started with your notes instead of a form? Clarify.pm turns rough thoughts into tasks, decisions, and insights, suggests where they belong, and keeps each item connected to the original note. Uncertain interpretations come back to you for review.",
+  "types": [
+    "project"
+  ],
+  "level": "sovereign",
+  "external": "https://clarify.pm/",
+  "specimen": {
+    "kind": "image",
+    "source": null,
+    "selector": null,
+    "alt": "Clarify.pm homepage: Your notes, with a next step."
+  }
+}

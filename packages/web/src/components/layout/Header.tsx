@@ -10,7 +10,7 @@ function Logo() {
     <Link to="/projects" className="flex items-center gap-2 no-underline">
       <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-[6px] bg-[linear-gradient(135deg,var(--accent-task),var(--accent-decision),var(--accent-insight))] shadow-[0_0_0_1px_rgba(255,255,255,0.06)_inset,0_10px_30px_rgba(0,0,0,0.45)]" />
       <span className="font-[var(--font-display)] text-[18px] font-extrabold tracking-[-0.03em] text-[var(--text-primary)]">
-        PM Agent
+        Clarify.pm
       </span>
     </Link>
   );
