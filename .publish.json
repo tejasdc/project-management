@@ -9,8 +9,8 @@
   "external": "https://clarify.pm/",
   "specimen": {
     "kind": "image",
-    "source": null,
+    "source": "/specimens/clarify-dark.png",
     "selector": null,
-    "alt": "Clarify.pm homepage: Your notes, with a next step."
+    "alt": "Clarify.pm homepage in dark mode: Your notes, with a next step."
   }
 }
