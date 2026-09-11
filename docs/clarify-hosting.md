@@ -82,6 +82,13 @@ Provide API access from the account/workspace that owns `pm-web`, `pm-api`, `pm-
 `pm-db`, and `pm-redis`, or the corresponding renamed services. A workspace/dashboard
 link helps identify them. Keep tokens out of Slack; use an authenticated Render session
 or a protected local credential file. Do not overwrite the existing IdeaFlow credential.
+For a separate Clarify.pm key, use `~/.config/render/clarify.env` on remote-box with
+`RENDER_API_KEY` set and file permissions `600`; share only the file path in chat.
+The key must belong to the account whose dashboard actually shows Clarify.pm's services:
+Render keys inherit all of their account's workspace memberships. The current key's
+workspace listing exposes only Ideaflow, so changing MCP workspace selection is insufficient.
+[Create/manage API keys](https://dashboard.render.com/u/settings?add-api-key=),
+[authentication contract](https://api-docs.render.com/reference/authentication).
 
 `clarify.pm` and `api.clarify.pm` already point to Render. No DNS migration or DNS
 credentials are required merely to inspect the services or deploy to the existing site.

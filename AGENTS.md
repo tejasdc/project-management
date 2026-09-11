@@ -9,6 +9,9 @@
 
 ## Public homepage
 
+The product name is **Clarify.pm**, including the domain suffix in project headings,
+wordmarks, and descriptions. Do not shorten it to "Clarify" (Tejas, 2026-09-11).
+
 **Hosting decision (2026-09-11): keep the application and homepage on Render, using
 `https://clarify.pm/`. The Cloudflare migration is canceled.** The portfolio must link
 to that domain, never the temporary Pages URL.

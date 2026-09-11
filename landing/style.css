@@ -12,7 +12,7 @@ a:hover{color:var(--accent)}
 .wrap{width:calc(100% - 96px);max-width:1280px;margin-inline:auto}
 .site-header{display:flex;align-items:center;justify-content:space-between;height:100px;font-size:14px;line-height:1.4}
 .wordmark{font:600 32px/1 Bricolage,sans-serif;letter-spacing:-1.5px}
-.wordmark span{color:var(--accent);margin-left:3px}
+.wordmark span{color:var(--accent);margin-left:0}
 nav{display:flex;align-items:center;gap:36px}
 nav a{padding-block:12px}
 nav span{margin-left:9px}
