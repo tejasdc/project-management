@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c0e14">
+    <meta name="description" content="Clarify turns rough notes into tasks, decisions, and insights, with the original context always attached.">
+    <meta property="og:title" content="Clarify — Your notes, with a next step.">
+    <meta property="og:description" content="An experiment in project management that starts with what you already write.">
+    <meta property="og:type" content="website">
+    <title>Clarify — Your notes, with a next step.</title>
+    <link rel="icon" href="data:,">
+    <link rel="preload" href="/assets/bricolage-600.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/example.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header wrap">
+      <a class="wordmark" href="/" aria-label="Clarify home">clarify<span aria-hidden="true">/</span></a>
+      <nav aria-label="Main navigation">
+        <a href="#idea">The idea</a>
+        <a href="#example">Explore an example <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero wrap" aria-labelledby="headline">
+        <div class="hero-copy">
+          <p class="eyebrow">A place for work to take shape</p>
+          <h1 id="headline">Your notes,<br>with a <span>next step.</span></h1>
+          <p class="intro">Capture a thought. Clarify finds the tasks, decisions, and insights, and keeps them connected to their source.</p>
+          <a class="button" href="#example">Explore an example <span aria-hidden="true">↗</span></a>
+        </div>
+        <figure class="hero-image">
+          <img src="/assets/notes-to-order.webp" width="1536" height="1024" fetchpriority="high" alt="Loose paper notes finding their way into three small, organized stacks.">
+        </figure>
+      </section>
+      <section class="example-section wrap" id="example" aria-labelledby="example-heading">
+        <div class="section-heading">
+          <h2 id="example-heading">A little structure.<br>The whole thought intact.</h2>
+          <p>One note can hold something to do, a choice you've made, and something you've learned. Clarify gives each a place.</p>
+        </div>
+        <div class="example">
+          <div class="note">
+            <div class="note-heading"><span>Original note</span><span>Website refresh</span></div>
+            <blockquote>
+              <mark data-source="decision">Let's keep the homepage focused on a single example.</mark>
+              <mark class="selected" data-source="task">I need to sketch the first version on Friday.</mark>
+              <mark data-source="insight">People understand it faster when they see their own words become something useful.</mark>
+            </blockquote>
+            <p class="note-caption">Your words stay attached.</p>
+          </div>
+          <div class="interpretation">
+            <p class="example-instruction" id="example-instruction">Select an item to see its source.</p>
+            <div class="items" role="group" aria-describedby="example-instruction" aria-label="Example extracted items">
+              <button class="item task" data-item="task" aria-pressed="true">
+                <span class="type">Task</span>
+                <span class="item-title">Sketch the first version</span>
+                <span class="item-detail">Friday</span>
+                <span class="item-arrow" aria-hidden="true">↖</span>
+              </button>
+              <button class="item decision" data-item="decision" aria-pressed="false">
+                <span class="type">Decision</span>
+                <span class="item-title">Build the homepage around one example</span>
+                <span class="item-arrow" aria-hidden="true">↖</span>
+              </button>
+              <button class="item insight" data-item="insight" aria-pressed="false">
+                <span class="type">Insight</span>
+                <span class="item-title">Familiar words make the idea easier to understand</span>
+                <span class="item-arrow" aria-hidden="true">↖</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="example-caption">A worked example, not a live extraction. Nothing you do here is sent or saved.</p>
+        <p id="selection-status" class="sr-only" aria-live="polite"></p>
+      </section>
+      <section class="idea wrap" id="idea" aria-labelledby="idea-heading">
+        <div class="idea-heading">
+          <h2 id="idea-heading">Write first.<br>Organize from there.</h2>
+          <p>Project management usually starts with a form. Clarify starts with what you're thinking.</p>
+        </div>
+        <div class="principles">
+          <article>
+            <h3>Capture without sorting</h3>
+            <p>Get the rough thought down while it's there. AI extracts the useful pieces and suggests where they belong.</p>
+          </article>
+          <article>
+            <h3>Keep the context</h3>
+            <p>Tasks, decisions, and insights link back to the original note. The interpretation never replaces your words.</p>
+          </article>
+          <article>
+            <h3>Leave room for judgment</h3>
+            <p>Uncertain interpretations go to review. Revisit the source, correct a suggestion, or decide where an item belongs.</p>
+          </article>
+        </div>
+      </section>
+      <section class="closing wrap" aria-label="About Clarify">
+        <p>An experiment in project management<br>that starts with what you already write.</p>
+        <a href="https://tejas.nyc/">A project by Tejas <span aria-hidden="true">↗</span></a>
+      </section>
+    </main>
+    <footer class="site-footer wrap"><a class="wordmark" href="/">clarify<span aria-hidden="true">/</span></a><span>Keep the thought. Find the next step.</span></footer>
+  </body>
+</html>

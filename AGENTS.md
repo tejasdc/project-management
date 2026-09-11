@@ -7,6 +7,29 @@
 - **Worker**: BullMQ background jobs for AI extraction (packages/api/src/worker.ts)
 - **Infra**: Render (pm-api, pm-web, pm-worker, pm-redis, pm-db)
 
+## Public homepage
+
+`landing/` is the standalone Clarify marketing site, hosted on Cloudflare Pages as
+`clarify-homepage`. It uses plain HTML/CSS/JS and self-hosted fonts; no build or app
+credentials are needed. Its interactive example is explicitly illustrative and never
+calls the API. Keep it independent of `packages/web`, the existing authenticated app.
+`clarify.pm` still points to Render; publishing the homepage does not migrate that domain
+or any application data. Hosting and migration evidence: `docs/clarify-hosting.md`.
+Include `[skip render]` in homepage-only commit messages so integration into main does
+not trigger a rebuild of the old Render app.
+
+Publish from remote-box with the shared Cloudflare credential loaded:
+`npx wrangler pages deploy landing --project-name clarify-homepage --branch main`.
+Preview locally with `python3 -m http.server 14389 --bind 127.0.0.1 --directory landing`
+(choose another free port for concurrent previews).
+
+## Worktree setup
+
+`scripts/worktree-bootstrap.sh` runs `corepack pnpm install --frozen-lockfile`, then
+builds `@pm/shared`. It copies no additional local files, starts no services, and sets
+no ports or environment variables. The wt manager owns automatic ignored `.env*`
+copying. A fresh worktree is ready when `corepack pnpm --filter @pm/web build` passes.
+
 ## Build & Test
 ```
 pnpm --filter @pm/shared build          # Build shared first
