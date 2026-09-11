@@ -9,17 +9,20 @@
 
 ## Public homepage
 
-`landing/` is the standalone Clarify marketing site, hosted on Cloudflare Pages as
-`clarify-homepage`. It uses plain HTML/CSS/JS and self-hosted fonts; no build or app
-credentials are needed. Its interactive example is explicitly illustrative and never
-calls the API. Keep it independent of `packages/web`, the existing authenticated app.
-`clarify.pm` still points to Render; publishing the homepage does not migrate that domain
-or any application data. Hosting and migration evidence: `docs/clarify-hosting.md`.
-Include `[skip render]` in homepage-only commit messages so integration into main does
-not trigger a rebuild of the old Render app.
+**Hosting decision (2026-09-11): keep the application and homepage on Render, using
+`https://clarify.pm/`. The Cloudflare migration is canceled.** The portfolio must link
+to that domain, never the temporary Pages URL.
 
-Publish from remote-box with the shared Cloudflare credential loaded:
-`npx wrangler pages deploy landing --project-name clarify-homepage --branch main`.
+`landing/` contains the prepared marketing homepage (plain HTML/CSS/JS and self-hosted
+fonts). Its example is explicitly illustrative and never calls the API. It was published
+temporarily as `clarify-homepage.pages.dev`; that is not the intended hosting target.
+Render publication is pending access to the workspace owning the existing `pm-*`
+resources. Inspect the actual `pm-web` settings before integrating the homepage, and
+preserve the authenticated app's routes. Do not create a replacement backend or database.
+Hosting evidence and access requirements: `docs/clarify-hosting.md`.
+
+Until the existing Render deployment is inspected, use `[skip render]` for docs-only
+or preparation commits. Do not treat a Git push as proof of a Render deploy.
 Preview locally with `python3 -m http.server 14389 --bind 127.0.0.1 --directory landing`
 (choose another free port for concurrent previews).
 

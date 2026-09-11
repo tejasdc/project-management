@@ -3,6 +3,14 @@
 Investigated on 2026-09-11 from remote-box. Source repository:
 `tejasdc/project-management`, available at `/root/workspace/project-management`.
 
+## Current decision
+
+Tejas's 2026-09-11 follow-up cancels the Cloudflare migration: **keep both the app and
+the marketing homepage on Render, at `https://clarify.pm/`.** The portfolio link uses
+that canonical domain. The marketing homepage source is ready in `landing/`, but its
+Render deployment is pending access to the workspace owning Clarify's existing services.
+The Cloudflare comparison below is historical research, not an implementation plan.
+
 ## What the project is
 
 Clarify is a project-management experiment built around quick, unstructured capture.
@@ -47,33 +55,42 @@ backend, worker, database, and Redis health remain unknown; an empty service lis
 does not prove deletion. Access to the Clarify-owning Render workspace is needed to
 inspect logs and determine whether the database can be exported.
 
-## Homepage delivery
+## Homepage source and temporary preview
 
 `landing/` is a dependency-free public homepage with a labeled worked example,
 keyboard-operable source highlighting, light/dark themes, self-hosted fonts, and no
 network-backed capture or sign-up flow. It makes no claim that the old app is healthy.
-It is hosted independently as Cloudflare Pages project `clarify-homepage`, at
-`https://clarify-homepage.pages.dev`. Publishing it changes neither the existing app
-routes nor DNS nor user data.
+It was published independently as Cloudflare Pages project `clarify-homepage`, at
+`https://clarify-homepage.pages.dev`, before the hosting correction. That temporary
+preview is not the canonical product URL. Do not continue deploying the homepage there.
+Its publication changed neither the existing app routes nor DNS nor user data.
 
-Deployment from remote-box, after loading `~/.config/cloudflare/deploy.env`:
+Inspect the real `pm-web` Render configuration and integrate the prepared homepage
+without breaking the existing authenticated app routes. The checked-in blueprint currently
+builds only `packages/web`; pushing `landing/` alone does not publish it on Render.
+Retire the temporary preview after the Render homepage is verified. Never publish the
+repository root: it contains private code and operational documentation.
 
-```sh
-npx wrangler pages deploy landing --project-name clarify-homepage --branch main
-```
-
-Use the existing shared Cloudflare deployment token. Do not create a project-specific
-token. To roll back, redeploy `landing/` from a previous verified Git commit. Never
-deploy the repository root: it contains private code and operational documentation.
-Homepage-only commits use `[skip render]` so they can be integrated into `main`
-without triggering the old app's automatic deploy; this is Render's documented
+Docs-only and preparation commits use `[skip render]` until the actual deployment is
+inspected; this is Render's documented
 [skip mechanism](https://render.com/docs/deploys#skipping-an-auto-deploy).
 
-Before moving the apex, obtain access to its current DNS provider, preserve the complete
-zone including email records, and decide where the existing app will remain reachable.
-The static preview is usable without resolving that ownership boundary.
+## Access needed next
 
-## Can everything move to Cloudflare?
+The current Render credential authenticates but does not expose Clarify's resources.
+Provide API access from the account/workspace that owns `pm-web`, `pm-api`, `pm-worker`,
+`pm-db`, and `pm-redis`, or the corresponding renamed services. A workspace/dashboard
+link helps identify them. Keep tokens out of Slack; use an authenticated Render session
+or a protected local credential file. Do not overwrite the existing IdeaFlow credential.
+
+`clarify.pm` and `api.clarify.pm` already point to Render. No DNS migration or DNS
+credentials are required merely to inspect the services or deploy to the existing site.
+After access is restored, inspect deployment and environment state, check Postgres and
+Redis, verify the worker's existing Anthropic credential, and exercise login, capture,
+extraction, organization, review, and live updates with a dedicated test account.
+Only request another service credential if that inspection proves it missing or invalid.
+
+## Historical Cloudflare assessment (canceled)
 
 Yes in principle, but the full app needs adaptation rather than a hosting switch.
 
