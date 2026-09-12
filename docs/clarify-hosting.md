@@ -5,11 +5,17 @@ Investigated on 2026-09-11 from remote-box. Source repository:
 
 ## Current decision
 
-Tejas's 2026-09-11 follow-up cancels the Cloudflare migration: **keep both the app and
-the marketing homepage on Render, at `https://clarify.pm/`.** The portfolio link uses
-that canonical domain. The marketing homepage source is in `packages/web/src/components/Homepage.tsx`
-and the existing Render frontend serves it at the public root route.
-The Cloudflare comparison below is historical research, not an implementation plan.
+Tejas's latest 2026-09-11 request supersedes the earlier Render-only decision:
+**migrate the full application to Cloudflare free-tier infrastructure**, preserving
+product behavior and recoverable data. See the [current research and proposed
+implementation](plans/2026-09-11-cloudflare-free-tier.md). The missing database's
+recovery versus an empty workspace remains an explicit owner decision; domain
+control also needs resolution. The migration is not yet implemented or deployed.
+
+The canonical URL remains `https://clarify.pm/`, including the portfolio link.
+The existing Render frontend still serves the marketing homepage from
+`packages/web/src/components/Homepage.tsx`. The Render evidence and procedures below
+describe that current deployment; the old Cloudflare comparison is historical.
 
 ## What the project is
 
@@ -138,12 +144,14 @@ these services. Render keys inherit their account's workspace memberships.
 
 `clarify.pm` and `api.clarify.pm` already point to Render. No DNS migration or DNS
 credentials are required merely to inspect the services or deploy to the existing site.
-After database recovery is resolved and the existing Redis/worker are resumed, verify
-the worker's existing Anthropic credential, and exercise login, capture,
-extraction, organization, review, and live updates with a dedicated test account.
-Only request another service credential if that inspection proves it missing or invalid.
+The later Cloudflare request supersedes the earlier Redis/worker-resumption plan;
+leave those paid resources suspended. The existing Anthropic key passed a models
+lookup and tiny inference probe, but the app's retired Sonnet default needs a
+supported replacement. Perform full login/capture/extraction/organization/review
+and live-update acceptance on the Cloudflare target as described in the current
+plan. Domain cutover to Cloudflare does require DNS control for both hostnames.
 
-## Historical Cloudflare assessment (canceled)
+## Earlier Cloudflare assessment (superseded by current research)
 
 Yes in principle, but the full app needs adaptation rather than a hosting switch.
 
