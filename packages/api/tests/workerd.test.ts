@@ -62,6 +62,15 @@ beforeAll(async () => {
 });
 afterAll(async () => { blocked?.(); await mf?.dispose(); });
 describe("actual Cloudflare runtime", () => {
+  it("preserves the canonical www redirect and serves both API hostnames", async () => {
+    const redirected = await mf.dispatchFetch("https://www.clarify.pm/projects?view=active", { redirect: "manual" });
+    expect(redirected.status).toBe(301);
+    expect(redirected.headers.get("location")).toBe("https://clarify.pm/projects?view=active");
+    for (const host of ["clarify.pm", "api.clarify.pm"]) {
+      expect((await mf.dispatchFetch(`https://${host}/api/health`)).status).toBe(200);
+      expect((await mf.dispatchFetch(`https://${host}/api/projects`)).status).toBe(401);
+    }
+  });
   it("protects registration and user responses, supports login and CORS", async () => {
     expect((await request("/api/auth/register", { name: "Intruder", email: "intruder@example.test", password: "password123", registrationCode: "wrong" }, "")).status).toBe(401);
     for (const path of ["/api/users", "/api/auth/me"]) {

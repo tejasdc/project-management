@@ -12,9 +12,13 @@ Resolve actual unsafe patterns before release; do not treat every text match as 
 new permission gate.
 
 Check wrangler.jsonc provisions this project's own SQLite Workspace namespace and
-routes only dynamic paths through the Worker. render.yaml must contain only the
-existing free static frontend. Never recreate pm-db or resume paid Redis/worker
+keeps /assets/* and /homepage/* outside Worker execution. Page requests enter the
+Worker to preserve www canonical redirects; /api/* reaches the existing Workspace.
+render.yaml retains only the free DNS-cache fallback with auto-deploy disabled after
+cutover. Never recreate pm-db or resume paid Redis/worker
 resources. Blueprint auto-sync and old API/worker auto-deploy are disabled.
+Before custom-domain attachment, verify always_use_https=on. Probe HTTP redirects
+without credentials on apex, www and API hosts before live authentication.
 
 Review the actual whole diff under the global risk rules. Deploy using the canonical
 Cloudflare token, then verify login, real capture/extraction/organization/review,

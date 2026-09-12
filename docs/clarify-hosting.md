@@ -27,8 +27,9 @@ rate limits and hibernating live connections. Alarms run extraction and organiza
 No paid Postgres, Redis or persistent worker instance is needed.
 
 Workers/Durable Objects have free quotas shared with the account's other projects.
-No paid plan or subscription was enabled by this migration. Static assets bypass
-Worker execution. Idle WebSockets hibernate, and idle job processing has no timer.
+No paid plan or subscription was enabled by this migration. Built JS/CSS assets and
+homepage images bypass Worker execution. Pages enter the Worker for www redirects.
+Idle WebSockets hibernate, and idle job processing has no timer.
 Anthropic inference remains separately charged through the existing key. R2 is not
 used: its included allowance would not provide a hard zero-charge storage limit.
 
@@ -45,11 +46,25 @@ The domain currently delegates to ns1/ns2.dns-parking.com. On September 12, 2026
 the owner extended the existing Cloudflare token's permissions and zone creation
 succeeded. Zone 50540e5498009dda9b9cb0f9f8b47a43 is on the Free Website plan, pending
 activation, with assigned nameservers chuck.ns.cloudflare.com and
-nena.ns.cloudflare.com. Its DNS record list is currently empty: copy and verify the
-complete existing zone before changing nameservers. Public DNS still uses Hostinger.
+nena.ns.cloudflare.com. The owner supplied a Hostinger API token at
+/root/workspace/hostinger.txt (restricted to mode 600). API access works with curl;
+Hostinger rejects Python urllib's default client signature before authentication.
+The full Hostinger export contains three active records: apex A 216.24.57.1,
+www CNAME pm-web-xqnz.onrender.com and api CNAME pm-api-lxwo.onrender.com.
+There are no MX/TXT records, and the parent publishes no DNSSEC DS record.
+The three records were copied to the pending Cloudflare zone without proxying.
+The original zone and domain response are backed up under backups/domain-2026-09-12/
+in the migration worktree, with root-only permissions and excluded from Git.
 
-The owner will supply Hostinger access through a separately built credential-sharing
-website. That access has not yet been provided. Until it is available, the existing Render
+Hostinger accepted the nameserver update and its domain API now reports the
+Cloudflare pair. Parent DNS and Cloudflare activation still need convergence.
+Domain attachment is held by independent review until always_use_https=on is
+verified: the current deployment token returns an authentication error for both
+reading and updating this setting. Add Zone Settings Edit to the same token, enable
+Always Use HTTPS, and verify it before proceeding. No custom domains have been
+attached yet. Local shared/build/typechecks, 89 API tests and 11 native tests passed.
+
+Until domain cutover passes live acceptance, the existing Render
 static frontend serves the product URL with its VITE_API_URL rebuilt to point at
 Cloudflare. That static service adds no fixed backend hosting fee. It is mixed
 hosting; do not claim a completed all-Cloudflare domain migration.
@@ -100,9 +115,12 @@ Browser acceptance covers both desktop and phone in Chromium/WebKit on Linux.
 Live acceptance must exercise real Sonnet extraction and organization, review and
 reload persistence from the published app. Only then remove the homepage offline notice.
 
-For the final DNS move, use Hostinger access delivered through the owner's
-credential-sharing website to obtain the complete existing zone. Populate the pending
-Cloudflare zone while preserving unrelated MX/TXT records, verify the copied records,
-change registrar nameservers,
-then bind clarify.pm, www and api.clarify.pm to this Worker. Verify TLS, SPA deep links,
+For the final DNS move, verify the copied Cloudflare records against a fresh Hostinger
+export, change registrar nameservers to the assigned Cloudflare pair,
+verify always_use_https=on, then bind clarify.pm, www and api.clarify.pm to this Worker.
+Verify credential-free HTTP redirects on every hostname, TLS, SPA deep links,
 authenticated API requests and browser live updates before retiring the static service.
+The Worker configuration owns these domains and preserves www page redirects, paths
+and queries. Disable Render frontend auto-deploy after acceptance, retaining its free
+static fallback while prior DNS answers may be cached (original record TTL up to four
+hours, parent NS TTL one hour). Do not delete it during that cache window.

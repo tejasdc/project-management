@@ -82,7 +82,14 @@ export class Workspace extends DurableObject<Env> {
 }
 export default {
   async fetch(request: Request, env: Env) {
-    if (new URL(request.url).pathname.startsWith("/api/")) {
+    const url = new URL(request.url);
+    if (url.hostname === "www.clarify.pm") {
+      url.hostname = "clarify.pm";
+      url.protocol = "https:";
+      url.port = "";
+      return Response.redirect(url.toString(), 301);
+    }
+    if (url.pathname.startsWith("/api/")) {
       return env.WORKSPACE.getByName("clarify-workspace").fetch(request);
     }
     return env.ASSETS.fetch(request);

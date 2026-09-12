@@ -1,4 +1,4 @@
-# Existing free static frontend preserves clarify.pm until registrar/DNS access is available.
+# Legacy DNS-cache fallback only; production deploys use scripts/deploy-cloudflare.sh.
 # Blueprint auto-sync is disabled; do not restore the former paid services.
 services:
   - type: web

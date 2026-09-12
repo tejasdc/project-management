@@ -54,19 +54,23 @@ and always publishes a note notification, including when no assignments change.
 ## Hosting and release
 
 Canonical product URL: https://clarify.pm/; keep the portfolio link there.
-Cloudflare target: clarify-pm.thnkring.workers.dev. The complete app runs in that
-Worker. While registrar/DNS access is unavailable, the existing free Render static
-frontend can preserve clarify.pm with VITE_API_URL pointing to Cloudflare.
-The Cloudflare zone now exists but remains pending; Hostinger access will come through
-the owner's credential-sharing website. This does not complete the api.clarify.pm
-DNS migration. See docs/clarify-hosting.md for the zone and nameserver handoff.
+The clarify-pm Worker serves the complete application. Its configured custom domains
+are clarify.pm, www.clarify.pm and api.clarify.pm, sharing the same Workspace object.
+www page/API requests redirect to clarify.pm with their path and query preserved.
+Page requests pass through the Worker for canonical redirects; /assets/* and
+/homepage/* bypass execution. The browser uses same-origin /api requests.
+See docs/clarify-hosting.md for DNS cutover state, acceptance and rollback.
+Verify Cloudflare always_use_https=on before activating custom domains; domain
+ownership and DNS permissions do not include Zone Settings access. Preserve HTTPS
+enforcement and probe HTTP redirects without credentials before live sign-in.
 
 Use only ~/.config/cloudflare/deploy.env for deployment credentials.
 Render personal credentials: ~/.config/render/clarify.env. Existing static service:
 srv-d63tlvhr0fns73bsb560. Blueprint exs-d63thkkr85hc73bfn9i0 auto-sync and old API/worker
 auto-deploys were disabled and verified before changing deployment configuration.
-Never resume paid resources or restore the old Blueprint. render.yaml describes
-only the existing free static frontend, pending complete DNS cutover.
+Never resume paid resources or restore the old Blueprint. Render is only a rollback
+and DNS-cache fallback during domain cutover; its frontend must not auto-deploy after
+Cloudflare acceptance. Retain that free fallback while old DNS answers can be cached.
 
 Publish packages/web/dist only. Homepage: packages/web/src/components/Homepage.tsx,
 assets: packages/web/public/homepage/. The example is illustrative, never an API call.
