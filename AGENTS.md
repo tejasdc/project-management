@@ -74,6 +74,8 @@ auto-deploys were disabled and verified before changing deployment configuration
 Never resume paid resources or restore the old Blueprint. Render is only a rollback
 and DNS-cache fallback during domain cutover; its frontend must not auto-deploy after
 Cloudflare acceptance. Retain that free fallback while old DNS answers can be cached.
+Canonical domain acceptance passed September 12, 2026; the old API, worker and Redis
+are suspended, and the Render frontend has autoDeploy=no.
 
 Publish packages/web/dist only. Homepage: packages/web/src/components/Homepage.tsx,
 assets: packages/web/public/homepage/. The example is illustrative, never an API call.

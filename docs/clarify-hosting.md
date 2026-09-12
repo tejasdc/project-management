@@ -60,16 +60,27 @@ Always Use HTTPS was enabled and independently read back as on at 18:49:01 UTC,
 before attaching domains. The independent cutover review returned SHIP.
 At 18:51 UTC, the three exact backed-up Render records were replaced with
 Cloudflare-managed custom-domain records for the existing clarify-pm Worker.
-The Worker deployment is 82419030-d821-4114-8496-2b13d3b6924c, source 7d75e4f.
+The cutover deployment was 82419030-d821-4114-8496-2b13d3b6924c, source 7d75e4f.
+The final runtime release is 49fba64e-e27b-47fa-89c8-c776e76aa546, source da55ed5.
 All three hostnames share the unchanged Workspace namespace and object.
 The frontend uses same-origin /api and wss://clarify.pm/api/live.
 
 Credential-free public probes passed valid TLS, HTTP-to-HTTPS redirects on every
 hostname, www canonical redirects preserving paths and queries, SPA deep links,
 database health and anonymous API rejection. GitHub CI passed the release commit;
-local gates passed 89 API tests, 11 native tests, typechecks and the web build.
+local gates passed 89 API tests, 12 native tests, typechecks and the web build.
 Old DNS answers may still reach the free Render static fallback for up to four hours.
 That fallback already calls the Cloudflare API and has auto-deploy disabled.
+
+Final same-origin browser acceptance passed Chromium and WebKit on Linux at
+1440×1000 and 390×844: sign-in, live updates from both API hostnames, raw-note
+persistence and logout. A fresh real-AI capture exposed an epic suggestion referencing
+a nonexistent project; exact-response replay reproduced the foreign-key failure.
+The reviewed fix discards epic suggestions outside the active-project context and
+keeps valid project creation and review intact. The saved note then passed real
+reprocessing, organization, review persistence across both domain API entrances and
+source preservation. A post-fix Chromium check confirmed the error notice cleared.
+The deployed runtime commit passed GitHub CI. Verification account keys are revoked.
 
 New registrations require the workspace invitation code. Each invited account sees
 the same workspace. The code is a Worker secret, never a frontend environment value.
@@ -86,8 +97,9 @@ Wrangler OAuth. All runtime data belongs to this Worker's own Workspace namespac
 Render control remains available with ~/.config/render/clarify.env (personal workspace,
 separate from IdeaFlow). The migration disabled and verified:
 - Blueprint exs-d63thkkr85hc73bfn9i0 autoSync=false.
-- API srv-d63tmipr0fns73bsbcu0 autoDeploy=no.
+- API srv-d63tmipr0fns73bsbcu0 autoDeploy=no and suspended after canonical acceptance.
 - Worker srv-d64ftfogjchc739nejpg autoDeploy=no; it remains suspended.
+- Redis red-d64fsbf5r7bs73af5u4g status=suspended; the old Postgres resource remains absent.
 
 Existing static frontend srv-d63tlvhr0fns73bsb560 retains its clarify.pm/www domains
 and /* → /index.html rewrite solely for cached DNS and rollback. Its deployed
