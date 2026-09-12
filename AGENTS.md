@@ -101,6 +101,8 @@ with this runtime. Spec-check requires an independent advisory check of product 
 Consequential architecture and integrated high-risk release reviews follow global
 risk-based review rules. Delegate production log investigations to a bounded agent;
 direct release probes and live acceptance remain the delivering agent's work.
+The legacy render-debug command now routes diagnostics to the current Cloudflare
+runtime; its provider and credential authority is docs/clarify-hosting.md.
 
 ## Safety and library rules
 

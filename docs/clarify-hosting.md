@@ -39,35 +39,37 @@ claude-sonnet-4-6. Existing prompts, tool schemas, evidence and review behavior 
 ## URLs and access
 
 - Product: https://clarify.pm/
-- Cloudflare app/API: https://clarify-pm.thnkring.workers.dev/
-- Old API hostname: https://api.clarify.pm/ still needs DNS control.
+- API compatibility hostname: https://api.clarify.pm/
+- Provider app/API URL: https://clarify-pm.thnkring.workers.dev/
 
-The domain currently delegates to ns1/ns2.dns-parking.com. On September 12, 2026,
-the owner extended the existing Cloudflare token's permissions and zone creation
-succeeded. Zone 50540e5498009dda9b9cb0f9f8b47a43 is on the Free Website plan, pending
-activation, with assigned nameservers chuck.ns.cloudflare.com and
-nena.ns.cloudflare.com. The owner supplied a Hostinger API token at
+On September 12, 2026, the domain moved from ns1/ns2.dns-parking.com to
+chuck.ns.cloudflare.com and nena.ns.cloudflare.com. Both the authoritative parent
+and Cloudflare confirm activation. Zone 50540e5498009dda9b9cb0f9f8b47a43 uses the
+Free Website plan. The owner supplied a Hostinger API token at
 /root/workspace/hostinger.txt (restricted to mode 600). API access works with curl;
 Hostinger rejects Python urllib's default client signature before authentication.
 The full Hostinger export contains three active records: apex A 216.24.57.1,
 www CNAME pm-web-xqnz.onrender.com and api CNAME pm-api-lxwo.onrender.com.
 There are no MX/TXT records, and the parent publishes no DNSSEC DS record.
-The three records were copied to the pending Cloudflare zone without proxying.
+The three records were copied to Cloudflare without proxying before changing delegation.
 The original zone and domain response are backed up under backups/domain-2026-09-12/
 in the migration worktree, with root-only permissions and excluded from Git.
 
-Hostinger accepted the nameserver update and its domain API now reports the
-Cloudflare pair. Parent DNS and Cloudflare activation still need convergence.
-Domain attachment is held by independent review until always_use_https=on is
-verified: the current deployment token returns an authentication error for both
-reading and updating this setting. Add Zone Settings Edit to the same token, enable
-Always Use HTTPS, and verify it before proceeding. No custom domains have been
-attached yet. Local shared/build/typechecks, 89 API tests and 11 native tests passed.
+The same deployment token now has the required Zone Settings permission.
+Always Use HTTPS was enabled and independently read back as on at 18:49:01 UTC,
+before attaching domains. The independent cutover review returned SHIP.
+At 18:51 UTC, the three exact backed-up Render records were replaced with
+Cloudflare-managed custom-domain records for the existing clarify-pm Worker.
+The Worker deployment is 82419030-d821-4114-8496-2b13d3b6924c, source 7d75e4f.
+All three hostnames share the unchanged Workspace namespace and object.
+The frontend uses same-origin /api and wss://clarify.pm/api/live.
 
-Until domain cutover passes live acceptance, the existing Render
-static frontend serves the product URL with its VITE_API_URL rebuilt to point at
-Cloudflare. That static service adds no fixed backend hosting fee. It is mixed
-hosting; do not claim a completed all-Cloudflare domain migration.
+Credential-free public probes passed valid TLS, HTTP-to-HTTPS redirects on every
+hostname, www canonical redirects preserving paths and queries, SPA deep links,
+database health and anonymous API rejection. GitHub CI passed the release commit;
+local gates passed 89 API tests, 11 native tests, typechecks and the web build.
+Old DNS answers may still reach the free Render static fallback for up to four hours.
+That fallback already calls the Cloudflare API and has auto-deploy disabled.
 
 New registrations require the workspace invitation code. Each invited account sees
 the same workspace. The code is a Worker secret, never a frontend environment value.
@@ -87,10 +89,11 @@ separate from IdeaFlow). The migration disabled and verified:
 - API srv-d63tmipr0fns73bsbcu0 autoDeploy=no.
 - Worker srv-d64ftfogjchc739nejpg autoDeploy=no; it remains suspended.
 
-Existing static frontend srv-d63tlvhr0fns73bsb560 retains its verified clarify.pm/www
-domains and /* → /index.html rewrite. Set VITE_API_URL to the Cloudflare URL, rebuild,
-deploy the reviewed main commit and verify the actual canonical browser flow.
-render.yaml now contains only that static frontend. Do not manually sync the old
+Existing static frontend srv-d63tlvhr0fns73bsb560 retains its clarify.pm/www domains
+and /* → /index.html rewrite solely for cached DNS and rollback. Its deployed
+VITE_API_URL points to the Cloudflare provider URL and autoDeploy=no. Normal releases
+use only scripts/deploy-cloudflare.sh; do not redeploy the Render fallback.
+render.yaml describes only that free static service. Do not manually sync the old
 Blueprint, resume the old paid worker/Redis, or recreate the absent database.
 
 ## Data, recovery and acceptance
