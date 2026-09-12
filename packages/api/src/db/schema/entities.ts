@@ -1,23 +1,23 @@
 // src/db/schema/entities.ts
 
-import { pgTable, uuid, text, real, timestamp, jsonb, index, check } from "drizzle-orm/pg-core";
+import { enumCheck, sqliteTable, uuid, text, real, timestamp, jsonb, index, check } from "../columns";
 import { sql } from "drizzle-orm";
-import { entityTypeEnum } from "./enums.js";
-import { projects } from "./projects.js";
-import { epics } from "./epics.js";
-import { users } from "./users.js";
+import { entityTypeEnum } from "./enums";
+import { projects } from "./projects";
+import { epics } from "./epics";
+import { users } from "./users";
 import type {
   TaskAttributes,
   DecisionAttributes,
   InsightAttributes,
   EntityAiMeta,
   EntityEvidence,
-} from "./types.js";
+} from "./types";
 
-export const entities = pgTable(
+export const entities = sqliteTable(
   "entities",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     type: entityTypeEnum().notNull(),
     content: text().notNull(),
     status: text().notNull(),
@@ -31,11 +31,12 @@ export const entities = pgTable(
     attributes: jsonb().$type<TaskAttributes | DecisionAttributes | InsightAttributes>(),
     aiMeta: jsonb("ai_meta").$type<EntityAiMeta>(),
     evidence: jsonb("evidence").$type<EntityEvidence[]>(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
+    enumCheck("entities_type_values", table.type),
     // -- Core query patterns --
     index("entities_project_id_idx").on(table.projectId),
     index("entities_epic_id_idx").on(table.epicId),

@@ -16,8 +16,8 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   }
 
   const authHeader = c.req.header("authorization");
-  const sseApiKey = c.req.path.startsWith("/api/sse") ? (c.req.query("apiKey") ?? c.req.query("api_key") ?? "") : "";
-  const auth = authHeader || (sseApiKey ? `Bearer ${sseApiKey}` : "");
+  const protocolKey = c.req.path === "/api/live" ? c.req.header("sec-websocket-protocol")?.split(",").map(p => p.trim()).find(p => p.startsWith("pm_live_")) : undefined;
+  const auth = authHeader ?? (protocolKey ? `Bearer ${protocolKey}` : undefined);
   if (!auth) throw unauthorized("Missing Authorization header");
 
   const m = auth.match(/^Bearer\s+(.+)$/i);
@@ -34,12 +34,8 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   c.set("apiKey" as any, apiKey);
 
-  // Non-blocking last_used_at update (fire-and-forget).
-  void db
-    .update(apiKeys)
-    .set({ lastUsedAt: new Date() })
-    .where(and(eq(apiKeys.id, apiKey.id), isNull(apiKeys.revokedAt)))
-    .catch((err) => logger.warn({ err }, "Failed to update api_keys.last_used_at"));
+  db.update(apiKeys).set({ lastUsedAt: new Date() })
+    .where(and(eq(apiKeys.id, apiKey.id), isNull(apiKeys.revokedAt))).run();
 
   await next();
 };

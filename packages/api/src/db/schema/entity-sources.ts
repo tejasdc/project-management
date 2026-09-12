@@ -1,10 +1,10 @@
 // src/db/schema/entity-sources.ts
 
-import { pgTable, uuid, timestamp, primaryKey, index } from "drizzle-orm/pg-core";
-import { entities } from "./entities.js";
-import { rawNotes } from "./raw-notes.js";
+import { sqliteTable, uuid, timestamp, primaryKey, index } from "../columns";
+import { entities } from "./entities";
+import { rawNotes } from "./raw-notes";
 
-export const entitySources = pgTable(
+export const entitySources = sqliteTable(
   "entity_sources",
   {
     entityId: uuid("entity_id")
@@ -13,7 +13,7 @@ export const entitySources = pgTable(
     rawNoteId: uuid("raw_note_id")
       .notNull()
       .references(() => rawNotes.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     primaryKey({ columns: [table.entityId, table.rawNoteId] }),

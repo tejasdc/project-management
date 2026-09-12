@@ -1,12 +1,12 @@
 // src/db/schema/api-keys.ts
 
-import { pgTable, uuid, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
-import { users } from "./users.js";
+import { sqliteTable, uuid, text, timestamp, index, uniqueIndex } from "../columns";
+import { users } from "./users";
 
-export const apiKeys = pgTable(
+export const apiKeys = sqliteTable(
   "api_keys",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -14,7 +14,7 @@ export const apiKeys = pgTable(
     keyHash: text("key_hash").notNull(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     index("api_keys_user_id_idx").on(table.userId),

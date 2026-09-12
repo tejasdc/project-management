@@ -25,3 +25,7 @@ jobs:
       - run: pnpm -r run build
 
       - run: pnpm -r run typecheck
+
+      - run: pnpm --filter @pm/api test
+
+      - run: node scripts/test-worker.mjs

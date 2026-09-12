@@ -1,5 +1,8 @@
-import type { Job } from "bullmq";
-import { and, eq, inArray } from "drizzle-orm";
+import { assertCurrent, finishStep } from "./state.js";
+import { hydrateNote } from "../services/note-payload.js";
+import { inArray } from "../db/filters.js";
+import type { Job, NotesExtractJob } from "./state.js";
+import { and, eq } from "drizzle-orm";
 
 import { CONFIDENCE_THRESHOLD } from "@pm/shared";
 import { db } from "../db/index.js";
@@ -16,7 +19,6 @@ import {
 import { createJobLogger } from "../lib/logger.js";
 import { extractEntities } from "../ai/extraction.js";
 import { tryPublishEvent } from "../services/events.js";
-import { DEFAULT_JOB_OPTS, getEntitiesOrganizeQueue, type NotesExtractJob } from "./queue.js";
 
 function cleanObject<T extends Record<string, unknown>>(obj: T) {
   const out: Record<string, unknown> = {};
@@ -33,18 +35,15 @@ function getFieldConfidence(entity: any, field: string) {
   return fc as { confidence: number; reason?: string };
 }
 
-function isDeterministicZodError(err: unknown) {
-  return typeof err === "object" && err !== null && "issues" in err && Array.isArray((err as any).issues);
-}
-
 export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
   const log = createJobLogger(job);
   const { rawNoteId } = job.data;
 
-  const note = await db.query.rawNotes.findFirst({
+  const storedNote = await db.query.rawNotes.findFirst({
     where: (t, { eq }) => eq(t.id, rawNoteId),
   });
-  if (!note) return;
+  if (!storedNote) return;
+  const note = hydrateNote(storedNote);
   if (note.processed) return;
 
   try {
@@ -59,12 +58,13 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
     const createdReviewItems: Array<{ id: string; entityId: string | null; projectId: string | null; reviewType: string; status: string }> = [];
     const permalink = (note.sourceMeta as any)?.permalink as string | undefined;
 
-    await db.transaction(async (tx) => {
+    await db.transaction((tx) => {
+      assertCurrent(tx, job);
       // Clear any prior error before re-attempting.
-      await tx
+      tx
         .update(rawNotes)
         .set({ processingError: null })
-        .where(eq(rawNotes.id, rawNoteId));
+        .where(eq(rawNotes.id, rawNoteId)).run();
 
       // Insert entities
       for (const ent of extraction.result.entities) {
@@ -86,7 +86,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
           fieldConfidence: ent.fieldConfidence,
         };
 
-        const [row] = await tx
+        const [row] = tx
           .insert(entities)
           .values({
             type: ent.type,
@@ -97,22 +97,22 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
             aiMeta: aiMeta as any,
             evidence: evidence as any,
           })
-          .returning({ id: entities.id });
+          .returning({ id: entities.id }).all();
 
         createdEntityIds.push(row!.id);
 
-        await tx.insert(entitySources).values({
+        tx.insert(entitySources).values({
           entityId: row!.id,
           rawNoteId: note.id,
-        });
+        }).run();
 
-        await tx.insert(entityEvents).values({
+        tx.insert(entityEvents).values({
           entityId: row!.id,
           type: "comment",
           rawNoteId: note.id,
           body: "Extracted from raw note",
           meta: { jobId: String(job.id ?? ""), model: extraction.model, promptVersion: extraction.promptVersion } as any,
-        });
+        }).run();
       }
 
       // Relationships (intra-note)
@@ -120,12 +120,12 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
         const sourceId = createdEntityIds[rel.sourceIndex];
         const targetId = createdEntityIds[rel.targetIndex];
         if (!sourceId || !targetId) continue;
-        await tx.insert(entityRelationships).values({
+        tx.insert(entityRelationships).values({
           sourceId,
           targetId,
           relationshipType: rel.relationshipType,
           metadata: { createdBy: "ai", reason: "extracted_in_note" } as any,
-        });
+        }).run();
       }
 
       // Tags: upsert tag names and attach to entities.
@@ -140,12 +140,12 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
       const tagNames = Array.from(allTagNames);
       if (tagNames.length > 0) {
         // Best-effort insert; ignore conflicts on unique tag name.
-        await tx.insert(tags).values(tagNames.map((name) => ({ name })) as any).onConflictDoNothing();
+        for (const name of tagNames) tx.insert(tags).values({ name }).onConflictDoNothing().run();
 
-        const tagRows = await tx
+        const tagRows = tx
           .select({ id: tags.id, name: tags.name })
           .from(tags)
-          .where(inArray(tags.name, tagNames));
+          .where(inArray(tags.name, tagNames)).all();
 
         const tagIdByName = new Map(tagRows.map((r) => [r.name, r.id]));
 
@@ -158,7 +158,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
             .filter(Boolean)
             .map((tagId) => ({ entityId, tagId: tagId as string }));
           if (values.length === 0) continue;
-          await tx.insert(entityTags).values(values as any).onConflictDoNothing();
+          for (const value of values) tx.insert(entityTags).values(value).onConflictDoNothing().run();
         }
       }
 
@@ -173,7 +173,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
           if (fc.confidence >= CONFIDENCE_THRESHOLD) continue;
 
           if (fieldKey === "type") {
-            const [row] = await tx
+            const [row] = tx
               .insert(reviewQueue)
               .values({
                 entityId,
@@ -183,7 +183,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
                 aiConfidence: fc.confidence,
               })
               .onConflictDoNothing()
-              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status }).all();
             if (row) createdReviewItems.push(row);
             continue;
           }
@@ -191,7 +191,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
           if (fieldKey === "owner") {
             const owner = ent?.attributes?.owner ?? null;
             if (!owner) continue;
-            const [row] = await tx
+            const [row] = tx
               .insert(reviewQueue)
               .values({
                 entityId,
@@ -201,7 +201,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
                 aiConfidence: fc.confidence,
               })
               .onConflictDoNothing()
-              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+              .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status }).all();
             if (row) createdReviewItems.push(row);
             continue;
           }
@@ -213,7 +213,7 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
                 ? (ent.attributes as any)[fieldKey]
                 : undefined;
 
-          const [row] = await tx
+          const [row] = tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -223,12 +223,12 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
               aiConfidence: fc.confidence,
             })
             .onConflictDoNothing()
-            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status }).all();
           if (row) createdReviewItems.push(row);
         }
 
         if (typeof ent.confidence === "number" && ent.confidence < CONFIDENCE_THRESHOLD) {
-          const [row] = await tx
+          const [row] = tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -238,16 +238,17 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
               aiConfidence: ent.confidence,
             })
             .onConflictDoNothing()
-            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status });
+            .returning({ id: reviewQueue.id, entityId: reviewQueue.entityId, projectId: reviewQueue.projectId, reviewType: reviewQueue.reviewType, status: reviewQueue.status }).all();
           if (row) createdReviewItems.push(row);
         }
       }
 
       // Mark note processed (even if no entities were extracted).
-      await tx
+      tx
         .update(rawNotes)
         .set({ processed: true, processedAt: new Date(), processingError: null })
-        .where(eq(rawNotes.id, rawNoteId));
+        .where(eq(rawNotes.id, rawNoteId)).run();
+      finishStep(tx, job, createdEntityIds);
     });
 
     // Emit SSE events after commit.
@@ -259,36 +260,9 @@ export async function notesExtractProcessor(job: Job<NotesExtractJob>) {
       await tryPublishEvent("review_queue:created", item);
     }
 
-    if (createdEntityIds.length > 0) {
-      const organizeQueue = getEntitiesOrganizeQueue();
-      if (organizeQueue) {
-        await organizeQueue.add(
-          "entities-organize",
-          { rawNoteId, entityIds: createdEntityIds },
-          {
-            ...DEFAULT_JOB_OPTS,
-            jobId: rawNoteId,
-            attempts: 5,
-            backoff: { type: "exponential", delay: 2000 + Math.floor(Math.random() * 500) },
-          }
-        );
-      }
-    }
+
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log.error({ err, rawNoteId }, "notes:extract failed");
-
-    await db
-      .update(rawNotes)
-      .set({ processingError: msg })
-      .where(eq(rawNotes.id, rawNoteId));
-
-    if (isDeterministicZodError(err)) {
-      // Do not retry deterministic schema mismatches.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (job as any).discard?.();
-    }
-
+    log.error({ rawNoteId }, "notes:extract failed");
     throw err;
   }
 }

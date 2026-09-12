@@ -1,27 +1,28 @@
 // src/db/schema/raw-notes.ts
 
-import { pgTable, uuid, text, boolean, timestamp, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { enumCheck, sqliteTable, uuid, text, boolean, timestamp, jsonb, index, uniqueIndex } from "../columns";
 import { sql } from "drizzle-orm";
-import { noteSourceEnum } from "./enums.js";
-import { users } from "./users.js";
-import type { SourceMeta } from "./types.js";
+import { noteSourceEnum } from "./enums";
+import { users } from "./users";
+import type { SourceMeta } from "./types";
 
-export const rawNotes = pgTable(
+export const rawNotes = sqliteTable(
   "raw_notes",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     content: text().notNull(),
     source: noteSourceEnum().notNull(),
     externalId: text("external_id"),
     sourceMeta: jsonb("source_meta").$type<SourceMeta>(),
     capturedBy: uuid("captured_by").references(() => users.id, { onDelete: "set null" }),
-    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
     processed: boolean().notNull().default(false),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     processingError: text("processing_error"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
+    enumCheck("raw_notes_source_values", table.source),
     // The processing pipeline's primary query: "give me unprocessed notes ordered by capture time"
     index("raw_notes_unprocessed_captured_at_idx")
       .on(table.capturedAt, table.id)

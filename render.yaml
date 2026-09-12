@@ -1,38 +1,6 @@
+# Existing free static frontend preserves clarify.pm until registrar/DNS access is available.
+# Blueprint auto-sync is disabled; do not restore the former paid services.
 services:
-  # --- API Server ---
-  - type: web
-    name: pm-api
-    runtime: node
-    plan: free
-    region: oregon
-    buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/api build && cd packages/api && pnpm drizzle-kit migrate && pnpm tsx scripts/seed.ts"
-    startCommand: "node packages/api/dist/server.js"
-    healthCheckPath: /api/health
-    buildFilter:
-      paths:
-        - "packages/api/**"
-        - "packages/shared/**"
-        - "pnpm-lock.yaml"
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: "3001"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: pm-db
-          property: connectionString
-      - key: CORS_ORIGINS
-        value: "https://pm-web-xqnz.onrender.com,https://clarify.pm"
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: pm-redis
-          property: connectionString
-      - key: ANTHROPIC_API_KEY
-        sync: false
-
-  # --- Frontend Static Site ---
   - type: web
     name: pm-web
     runtime: static
@@ -40,12 +8,7 @@ services:
     staticPublishPath: ./packages/web/dist
     envVars:
       - key: VITE_API_URL
-        value: "https://api.clarify.pm"
-    buildFilter:
-      paths:
-        - "packages/web/**"
-        - "packages/shared/**"
-        - "pnpm-lock.yaml"
+        value: "https://clarify-pm.thnkring.workers.dev"
     routes:
       - type: rewrite
         source: /*
@@ -54,46 +17,3 @@ services:
       - path: /*
         name: X-Frame-Options
         value: sameorigin
-
-  # --- Background Worker ---
-  - type: worker
-    name: pm-worker
-    runtime: node
-    plan: starter
-    region: oregon
-    buildCommand: "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/api build"
-    startCommand: "node packages/api/dist/worker.js"
-    buildFilter:
-      paths:
-        - "packages/api/**"
-        - "packages/shared/**"
-        - "pnpm-lock.yaml"
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: pm-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: pm-redis
-          property: connectionString
-      - key: ANTHROPIC_API_KEY
-        sync: false
-
-  # --- Redis (Valkey) ---
-  - type: keyvalue
-    name: pm-redis
-    plan: starter
-    region: oregon
-    ipAllowList: []
-    maxmemoryPolicy: noeviction
-
-databases:
-  - name: pm-db
-    plan: free
-    region: oregon
-    postgresMajorVersion: "17"
-    databaseName: pm_agent

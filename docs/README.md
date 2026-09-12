@@ -1,39 +1,24 @@
 # Clarify.pm
 
-Clarify.pm turns unstructured notes into tasks, decisions, and insights, with source
-evidence and human review of uncertain suggestions.
+Clarify.pm turns notes into tasks, decisions and insights, with source evidence and
+human review. The canonical product address is https://clarify.pm/.
 
-The repository is [tejasdc/project-management](https://github.com/tejasdc/project-management).
-Its remote-box checkout is `/root/workspace/project-management`; the public homepage
-is [clarify.pm](https://clarify.pm/).
+- [Agent instructions](../AGENTS.md): current runtime, ownership and checks.
+- [Hosting](clarify-hosting.md): Cloudflare deployment, Render static fallback, DNS,
+  credentials, live verification and recovery.
+- [Migration design](plans/2026-09-11-cloudflare-free-tier.md): requirements and tradeoffs.
+- [Product design](project-management-agent.md), [frontend views](frontend-views.md) and
+  [extraction prompts](extraction-prompts.md): product semantics. Their old infrastructure
+  examples are historical; AGENTS.md and the hosting runbook supersede them.
+- [Database schema](database-schema.md) and [testing architecture](testing-architecture.md):
+  original Postgres-era design references, superseded for runtime operations.
 
-## Start here
+The owner explicitly authorized a fresh empty workspace/new login. SQLite Durable
+Objects and alarms replace paid Postgres/Redis/worker services. Render Blueprint
+auto-sync and old API/worker auto-deploys are disabled. Local API and native runtime
+verification are passing; publication and live acceptance are still underway.
 
-- [Agent instructions](../AGENTS.md): architecture, project conventions, and required checks.
-- [Hosting and recovery](clarify-hosting.md): Render services, credential location,
-  deployment and rollback, domain configuration, live verification, and backend blockers.
-- [Product and agent design](project-management-agent.md): capture, extraction, and organization.
-- [Extraction prompts](extraction-prompts.md): tasks, decisions, insights, and review.
-- [Frontend views](frontend-views.md), [database schema](database-schema.md), and
-  [testing architecture](testing-architecture.md): implementation references.
-
-## Delivery status — September 11, 2026
-
-The public homepage runs on the existing Render frontend at `https://clarify.pm/`.
-Its source is `packages/web/src/components/Homepage.tsx`; assets are under
-`packages/web/public/homepage/`. The temporary Cloudflare homepage was removed.
-Render's build command, publish directory, app-route rewrite, and Blueprint were
-left unchanged. Both light and dark themes were checked in Chromium and WebKit on
-Linux at desktop and mobile sizes.
-
-The homepage being live does not mean the application backend is working. The
-configured Postgres resource was not found, and Redis and the worker are suspended.
-Preserving old data versus starting fresh still needs the owner's decision. Leave
-the homepage's offline notice in place until login, capture, extraction, and review
-pass live acceptance. Read the hosting runbook before changing services or syncing
-the Blueprint.
-
-The personal-site entry is controlled by `.publish.json`, using the existing
-`clarify` slug, the full title **Clarify.pm**, and the canonical domain. Its selected
-portfolio image is a dark-mode screenshot at `/specimens/clarify-dark.png` in the
-`chann-app` repository. Publish descriptor changes through `ship-to-site`.
+Until registrar/DNS access is available, the existing free Render static frontend
+can preserve clarify.pm using the Cloudflare API. api.clarify.pm remains separate
+DNS compatibility work. Do not change the portfolio to a temporary URL.
+The personal-site entry remains controlled by .publish.json through ship-to-site.

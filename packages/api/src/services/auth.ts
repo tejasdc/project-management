@@ -1,6 +1,6 @@
 import { randomBytes, webcrypto } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 import { db } from "../db/index.js";
 import { apiKeys, users } from "../db/schema/index.js";
@@ -18,7 +18,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export async function generateApiKey() {
-  const hex = randomBytes(16).toString("hex"); // 32 hex chars
+  const hex = Buffer.from(randomBytes(16)).toString("hex"); // 32 hex chars
   const plaintextKey = `pm_live_${hex}`;
   const keyHash = await hashApiKey(plaintextKey);
   return { plaintextKey, keyHash };
@@ -47,4 +47,9 @@ export async function validateApiKey(plaintextKey: string) {
   if (!user) return null;
 
   return { apiKey, user };
+}
+
+export function publicUser(user: typeof users.$inferSelect) {
+ const { passwordHash: _passwordHash, ...safe } = user;
+ return safe;
 }

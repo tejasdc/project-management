@@ -4,20 +4,8 @@ import { createApp } from "../src/app.js";
 import { createTestApiKey, createTestUser } from "./factories.js";
 import { expectError } from "./helpers.js";
 
-// Mock the queue module so ioredis never tries to connect to Redis.
-vi.mock("../src/jobs/queue.js", () => ({
-  getNotesExtractQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getNotesReprocessQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getEntitiesOrganizeQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getEntitiesComputeEmbeddingsQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getReviewQueueExportTrainingDataQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  DEFAULT_JOB_OPTS: { removeOnComplete: true, removeOnFail: 500 },
-  isRedisConfigured: () => false,
-  getRedisConnection: () => null,
-  getRedisConnectionOrThrow: () => { throw new Error("Redis not available in tests"); },
-}));
 
-// Mock SSE events to prevent ioredis connections from the event publisher.
+// Keep notification assertions in the native Worker tests.
 vi.mock("../src/services/events.js", () => ({
   tryPublishEvent: vi.fn().mockResolvedValue(undefined),
   publishEvent: vi.fn().mockResolvedValue(undefined),
@@ -26,6 +14,26 @@ vi.mock("../src/services/events.js", () => ({
 }));
 
 describe("auth middleware", () => {
+  it("allows concurrent valid reads without consuming the failed-auth budget", async () => {
+    const user = await createTestUser();
+    const { plaintextKey } = await createTestApiKey({ userId: user.id });
+    const app = createApp();
+    const responses = await Promise.all(Array.from({ length: 32 }, () => app.request("/api/projects", {
+      headers: { authorization: `Bearer ${plaintextKey}` },
+    })));
+    expect(responses.map(response => response.status)).toEqual(Array(32).fill(200));
+  });
+
+  it("blocks after twenty failed authentication attempts", async () => {
+    const app = createApp();
+    const headers = { "cf-connecting-ip": "192.0.2.7" };
+    for (let attempt = 0; attempt < 20; attempt++) {
+      expect((await app.request("/api/auth/me", { headers })).status).toBe(401);
+    }
+    const blocked = await app.request("/api/auth/me", { headers });
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
   it("rejects requests without Authorization", async () => {
     const app = createApp();
     const res = await app.request("/api/auth/me");
@@ -46,4 +54,3 @@ describe("auth middleware", () => {
     expect(json.user?.id).toBe(user.id);
   });
 });
-

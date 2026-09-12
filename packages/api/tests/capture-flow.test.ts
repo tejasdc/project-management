@@ -4,20 +4,8 @@ import { createApp } from "../src/app.js";
 import { createTestApiKey, createTestUser } from "./factories.js";
 import { authedRequest } from "./helpers.js";
 
-// Mock the queue so capture doesn't require Redis.
-vi.mock("../src/jobs/queue.js", () => ({
-  getNotesExtractQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getNotesReprocessQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getEntitiesOrganizeQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getEntitiesComputeEmbeddingsQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  getReviewQueueExportTrainingDataQueue: () => ({ add: vi.fn().mockResolvedValue(undefined) }),
-  DEFAULT_JOB_OPTS: { removeOnComplete: true, removeOnFail: 500 },
-  isRedisConfigured: () => true,
-  getRedisConnection: () => null,
-  getRedisConnectionOrThrow: () => { throw new Error("Redis not available in tests"); },
-}));
 
-// Mock SSE events to prevent ioredis connections from the event publisher.
+// Keep notification assertions in the native Worker tests.
 vi.mock("../src/services/events.js", () => ({
   tryPublishEvent: vi.fn().mockResolvedValue(undefined),
   publishEvent: vi.fn().mockResolvedValue(undefined),

@@ -1,16 +1,16 @@
 // src/db/schema/entity-events.ts
 
-import { pgTable, uuid, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
-import { entityEventTypeEnum } from "./enums.js";
-import { entities } from "./entities.js";
-import { users } from "./users.js";
-import { rawNotes } from "./raw-notes.js";
-import type { EntityEventMeta } from "./types.js";
+import { enumCheck, sqliteTable, uuid, text, timestamp, jsonb, index } from "../columns";
+import { entityEventTypeEnum } from "./enums";
+import { entities } from "./entities";
+import { users } from "./users";
+import { rawNotes } from "./raw-notes";
+import type { EntityEventMeta } from "./types";
 
-export const entityEvents = pgTable(
+export const entityEvents = sqliteTable(
   "entity_events",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     entityId: uuid("entity_id")
       .notNull()
       .references(() => entities.id, { onDelete: "cascade" }),
@@ -21,9 +21,10 @@ export const entityEvents = pgTable(
     oldStatus: text("old_status"),
     newStatus: text("new_status"),
     meta: jsonb().$type<EntityEventMeta>(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
+    enumCheck("entity_events_type_values", table.type),
     index("entity_events_entity_id_created_at_idx").on(table.entityId, table.createdAt),
     index("entity_events_actor_user_id_idx").on(table.actorUserId),
   ]

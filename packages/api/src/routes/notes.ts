@@ -1,7 +1,8 @@
+import { hydrateNote } from "../services/note-payload.js";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, gte, ilike, isNull, lte, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, lt, or } from "drizzle-orm";
 
 import { NOTE_SOURCES, captureNoteSchema } from "@pm/shared";
 import type { AppEnv } from "../types/env.js";
@@ -99,7 +100,7 @@ export const noteRoutes = new Hono<AppEnv>()
         ? encodeCursor({ capturedAt: next.capturedAt.toISOString(), id: next.id } satisfies NotesCursor)
         : null;
 
-      return c.json({ items: pageItems, nextCursor });
+      return c.json({ items: pageItems.map(hydrateNote), nextCursor });
     }
   )
   .post(

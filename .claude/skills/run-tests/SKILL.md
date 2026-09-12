@@ -1,79 +1,18 @@
 ---
 name: run-tests
-description: "Build, typecheck, and test the PM Agent monorepo. Use before committing, before creating PRs, or whenever asked to verify the build. Catches type errors, broken imports, and test regressions."
-user_invocable: true
+description: Build, typecheck and test Clarify.pm before release.
 ---
+Catalog: `local-test` covers test design; this delta names Clarify.pm's commands.
 
-# Run Tests
+Build shared first: `corepack pnpm --filter @pm/shared build`.
+Then `corepack pnpm -r run typecheck`, `corepack pnpm --filter @pm/api test`,
+`corepack pnpm --filter @pm/web build`, and `node scripts/test-worker.mjs`.
 
-Full build + typecheck + test pipeline for the PM Agent monorepo.
+The API suite uses isolated in-memory SQLite per file, with native parallel execution.
+The native suite bundles the actual Worker and exercises Cloudflare SQLite, alarms,
+hibernating sockets, oversized payloads, retries, rollback and generation ownership.
+It uses local AI fixtures, not the live Anthropic account. No Docker/Redis is required.
 
-## When to Use
-
-- Before committing or creating a PR
-- After making changes across multiple packages
-- When asked to "run tests", "verify the build", or "check if it works"
-- After resolving merge conflicts
-
-## Pipeline
-
-Run these steps sequentially — each depends on the previous:
-
-### Step 1: Build shared package
-
-```bash
-pnpm --filter @pm/shared build
-```
-
-Shared must build first since api and web depend on it.
-
-### Step 2: Typecheck all packages
-
-Run in parallel:
-
-```bash
-pnpm --filter @pm/api exec tsc --noEmit
-pnpm --filter @pm/web exec tsc --noEmit
-pnpm --filter @pm/shared exec tsc --noEmit
-```
-
-If any typecheck fails, STOP and fix before proceeding.
-
-### Step 3: Run API tests
-
-```bash
-pnpm --filter @pm/api test
-```
-
-Tests use testcontainers (Docker required). Key config:
-- `fileParallelism: false` in vitest.config.ts (shared testcontainer)
-- Redis is mocked via `vi.mock` in test setup
-- DB is truncated between tests, not rolled back
-
-### Step 4: Build web package
-
-```bash
-pnpm --filter @pm/web build
-```
-
-Catches Vite build errors, CSS issues, and missing imports.
-
-## Report Results
-
-After all steps, summarize in a table:
-
-| Step | Status | Notes |
-|------|--------|-------|
-| Shared build | PASS/FAIL | ... |
-| API typecheck | PASS/FAIL | ... |
-| Web typecheck | PASS/FAIL | ... |
-| Shared typecheck | PASS/FAIL | ... |
-| API tests | PASS/FAIL | X passed, Y failed |
-| Web build | PASS/FAIL | ... |
-
-## Known Gotchas
-
-- **Node version**: Must be Node 22+ (check `.nvmrc`). Node <18 will crash on modern JS syntax.
-- **Zod v4**: Never import from `zod-to-json-schema` — use `z.toJSONSchema()` natively.
-- **Drizzle errors**: Check `err.cause.code` not `err.code` for Postgres error codes (Drizzle v0.45 wraps errors).
-- **Test open handles**: Tests may hang if SSE keepalive or rate limiter intervals aren't cleaned up. Check `afterAll` hooks.
+During repairs run only the affected tests; perform the integrated gates after the
+whole change. Report exact results and distinguish local runtime from live acceptance.
+Source: September 2026 Cloudflare migration; AGENTS.md and CI are current authority.

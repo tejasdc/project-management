@@ -1,18 +1,9 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-
-import * as schema from "./schema/index.js";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
-
-export const pool = new Pool({
-  connectionString: databaseUrl,
-  max: Number(process.env.DATABASE_POOL_SIZE ?? 10),
-  connectionTimeoutMillis: 5_000,
+import { getRuntime, type Database } from "../runtime.js";
+// Resolve at call time; multiple workspace objects can share an isolate.
+export const db = new Proxy({} as Database, {
+  get(_target, key) {
+    const database = getRuntime().db;
+    const value = Reflect.get(database, key);
+    return typeof value === "function" ? value.bind(database) : value;
+  },
 });
-
-export const db = drizzle(pool, { schema });
-export type Db = typeof db;

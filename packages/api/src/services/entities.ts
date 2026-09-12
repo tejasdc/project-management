@@ -171,29 +171,29 @@ export async function listEntityEvents(opts: { entityId: string; limit: number; 
 }
 
 export async function transitionEntityStatus(opts: { entityId: string; actorUserId: string; newStatus: string }) {
-  return db.transaction(async (tx) => {
-    const existing = await tx.query.entities.findFirst({
+  return db.transaction((tx) => {
+    const existing = tx.query.entities.findFirst({
       where: (t, { eq }) => eq(t.id, opts.entityId),
-    });
+    }).sync();
     if (!existing) throw notFound("entity", opts.entityId);
 
     assertValidStatus(existing.type as EntityType, opts.newStatus);
     if (existing.status === opts.newStatus) return existing;
 
-    const [entity] = await tx
+    const [entity] = tx
       .update(entities)
       .set({ status: opts.newStatus, updatedAt: new Date() })
       .where(eq(entities.id, opts.entityId))
-      .returning();
+      .returning().all();
 
-    await tx.insert(entityEvents).values({
+    tx.insert(entityEvents).values({
       entityId: opts.entityId,
       type: "status_change",
       actorUserId: opts.actorUserId,
       oldStatus: existing.status,
       newStatus: opts.newStatus,
       meta: { reason: "api" } as any,
-    });
+    }).run();
 
     return entity!;
   });

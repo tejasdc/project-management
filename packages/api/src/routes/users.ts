@@ -1,7 +1,8 @@
+import { publicUser } from "../services/auth.js";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { asc, eq, ilike, or } from "drizzle-orm";
+import { asc, eq, or } from "drizzle-orm";
 
 import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
@@ -20,14 +21,9 @@ export const userRoutes = new Hono<AppEnv>()
     const items = await db
       .select()
       .from(users)
-      .where(
-        q
-          ? or(ilike(users.name, `%${q}%`), ilike(users.email, `%${q}%`))
-          : undefined
-      )
       .orderBy(asc(users.name));
 
-    return c.json({ items });
+    return c.json({ items: items.filter(user => !q || user.name.toLowerCase().includes(q.toLowerCase()) || user.email.toLowerCase().includes(q.toLowerCase())).map(publicUser) });
   })
   .post(
     "/",
@@ -38,6 +34,6 @@ export const userRoutes = new Hono<AppEnv>()
       const data = c.req.valid("json");
 
       const [user] = await db.insert(users).values(data).returning();
-      return c.json({ user }, 201);
+      return c.json({ user: publicUser(user!) }, 201);
     }
   );

@@ -26,6 +26,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [registrationCode, setRegistrationCode] = React.useState("");
 
   React.useEffect(() => {
     function sync() {
@@ -114,7 +115,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password, registrationCode: registrationCode.trim() }),
       });
 
       const json = await res.json();
@@ -208,12 +209,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                 placeholder="Password (min 8 characters)"
                 type="password"
               />
+              <Input value={registrationCode} onChange={e => setRegistrationCode(e.target.value)}
+                placeholder="Workspace invitation code" aria-label="Workspace invitation code" autoComplete="off" />
+              <p className="text-xs text-[var(--text-secondary)]">Accounts share one workspace. Ask its owner for an invitation code.</p>
 
               {status === "error" && (
                 <p className="text-xs text-[var(--confidence-low)]">{errorMsg}</p>
               )}
 
-              <Button type="submit" disabled={!name.trim() || !email.trim() || !password || password.length < 8 || status === "validating"}>
+              <Button type="submit" disabled={!name.trim() || !email.trim() || !password || password.length < 8 || !registrationCode.trim() || status === "validating"}>
                 {status === "validating" ? "Creating..." : "Create Account"}
               </Button>
             </form>

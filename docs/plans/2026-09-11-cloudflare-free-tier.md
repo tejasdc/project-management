@@ -2,15 +2,18 @@
 
 ## Status and authority
 
-Research and proposed implementation, September 11, 2026. **Not implemented or
+Implementation and local verification underway, September 11, 2026. **Not yet
 deployed.** Tejas's later request authorizes migration to Cloudflare free-tier
 infrastructure and supersedes the earlier request to keep Render. Preserve the
 existing product; stop for decisions that materially change behavior or data.
 
-The unresolved owner decision is whether a new empty workspace is acceptable if
-the old database cannot be recovered. The Render database is confirmed absent;
-absence of every possible backup is not confirmed. A question is pending in the
-request's Slack thread. Do not treat elapsed time as authorization to start fresh.
+The owner authorized a fresh empty workspace and new login with “proceed” in the
+same Slack thread (message `1789173009.272589`). No old data import is required.
+Preserve old backup candidates if any later become available; do not delete them.
+
+Implementation refinements: keep all storage inside SQLite. Store each immutable raw-note payload (content and arbitrary sourceMeta) as ordered UTF-8 byte pages in a child table, committing pages, metadata and job intent together. A document is a sequence of pages, not one SQL value; use 64 KiB document pages as a stable storage representation, independent of provider limits. Reassemble before returning the existing API shape or invoking extraction. This avoids a metered R2 subscription and preserves large captures and Unicode without truncation. Foreign-key cascade owns page cleanup; duplicate capture never replaces original pages.
+
+Gate new registrations with a workspace invitation code delivered to the owner. Preserve the shared trusted-team workspace; explicitly project safe user fields in every response, including /users, user creation and /auth/me. Password hashes and API-key hashes never cross that response boundary. The existing login/API-key interface and Sonnet extraction contract remain intact.
 
 ## Workload and required behavior
 

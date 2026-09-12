@@ -1,14 +1,14 @@
 // src/db/schema/entity-relationships.ts
 
-import { pgTable, uuid, timestamp, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
-import { relationshipTypeEnum } from "./enums.js";
-import { entities } from "./entities.js";
-import type { RelationshipMeta } from "./types.js";
+import { enumCheck, sqliteTable, uuid, timestamp, jsonb, index, uniqueIndex } from "../columns";
+import { relationshipTypeEnum } from "./enums";
+import { entities } from "./entities";
+import type { RelationshipMeta } from "./types";
 
-export const entityRelationships = pgTable(
+export const entityRelationships = sqliteTable(
   "entity_relationships",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     sourceId: uuid("source_id")
       .notNull()
       .references(() => entities.id, { onDelete: "cascade" }),
@@ -17,9 +17,10 @@ export const entityRelationships = pgTable(
       .references(() => entities.id, { onDelete: "cascade" }),
     relationshipType: relationshipTypeEnum("relationship_type").notNull(),
     metadata: jsonb().$type<RelationshipMeta>(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
+    enumCheck("entity_relationships_relationshipType_values", table.relationshipType),
     // Traverse forward: "what did this entity produce?"
     index("entity_rel_source_id_idx").on(table.sourceId),
     // Traverse backward: "where did this entity come from?"

@@ -1,17 +1,14 @@
+import { inArray } from "../db/filters.js";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { asc, eq, ilike, inArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
 import { entities, entityTags, tags } from "../db/schema/index.js";
 import { tagInsertSchema } from "../db/validation.js";
 import { conflict, notFound } from "../lib/errors.js";
-
-function isUniqueViolation(err: unknown) {
-  return typeof err === "object" && err !== null && "code" in err && (err as any).code === "23505";
-}
 
 const listTagsQuerySchema = z.object({
   q: z.string().optional(),
@@ -36,10 +33,9 @@ export const tagRoutes = new Hono<AppEnv>()
       const items = await db
         .select()
         .from(tags)
-        .where(q ? ilike(tags.name, `%${q.trim().toLowerCase()}%`) : undefined)
         .orderBy(asc(tags.name));
 
-      return c.json({ items });
+      return c.json({ items: items.filter(tag => !q || tag.name.toLowerCase().includes(q.trim().toLowerCase())) });
     }
   )
   .post(
@@ -49,13 +45,9 @@ export const tagRoutes = new Hono<AppEnv>()
     }),
     async (c) => {
       const data = c.req.valid("json");
-      try {
-        const [tag] = await db.insert(tags).values(data as any).returning();
-        return c.json({ tag }, 201);
-      } catch (err) {
-        if (isUniqueViolation(err)) throw conflict("Tag already exists");
-        throw err;
-      }
+      const tag = db.insert(tags).values(data).onConflictDoNothing({ target: tags.name }).returning().get();
+      if (!tag) throw conflict("Tag already exists");
+      return c.json({ tag }, 201);
     }
   )
   .put(
@@ -73,14 +65,11 @@ export const tagRoutes = new Hono<AppEnv>()
       const entity = await db.query.entities.findFirst({ where: (t, { eq }) => eq(t.id, id) });
       if (!entity) throw notFound("entity", id);
 
-      await db.transaction(async (tx) => {
-        await tx.delete(entityTags).where(eq(entityTags.entityId, id));
+      await db.transaction((tx) => {
+        tx.delete(entityTags).where(eq(entityTags.entityId, id)).run();
         if (tagIds.length > 0) {
           // FK constraints ensure tag IDs are valid.
-          await tx
-            .insert(entityTags)
-            .values(tagIds.map((tagId) => ({ entityId: id, tagId })) as any)
-            .onConflictDoNothing();
+          for (const tagId of tagIds) tx.insert(entityTags).values({ entityId: id, tagId }).onConflictDoNothing().run();
         }
       });
 

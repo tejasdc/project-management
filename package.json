@@ -11,10 +11,14 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "better-sqlite3",
+      "workerd"
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22",
     "vitest": "^4.0.18"
   }
 }

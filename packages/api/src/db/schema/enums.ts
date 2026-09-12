@@ -1,16 +1,16 @@
 // src/db/schema/enums.ts
 
-import { pgEnum } from "drizzle-orm/pg-core";
+import { sqliteEnum } from "../columns";
 
 /** The three core entity types. Fixed by design -- unlikely to change. */
-export const entityTypeEnum = pgEnum("entity_type", [
+export const entityTypeEnum = sqliteEnum("entity_type", [
   "task",
   "decision",
   "insight",
 ]);
 
 /** How the raw note was captured. New sources added as integrations ship. */
-export const noteSourceEnum = pgEnum("note_source", [
+export const noteSourceEnum = sqliteEnum("note_source", [
   "cli",
   "slack",
   "voice_memo",
@@ -21,13 +21,13 @@ export const noteSourceEnum = pgEnum("note_source", [
 ]);
 
 /** Who created an epic. */
-export const epicCreatorEnum = pgEnum("epic_creator", [
+export const epicCreatorEnum = sqliteEnum("epic_creator", [
   "user",
   "ai_suggestion",
 ]);
 
 /** Relationship types between entities (graph edges). */
-export const relationshipTypeEnum = pgEnum("relationship_type", [
+export const relationshipTypeEnum = sqliteEnum("relationship_type", [
   "derived_from",
   "related_to",
   "promoted_to",
@@ -35,7 +35,7 @@ export const relationshipTypeEnum = pgEnum("relationship_type", [
 ]);
 
 /** What kind of review is needed. */
-export const reviewTypeEnum = pgEnum("review_type", [
+export const reviewTypeEnum = sqliteEnum("review_type", [
   "type_classification",
   "project_assignment",
   "epic_assignment",
@@ -47,7 +47,7 @@ export const reviewTypeEnum = pgEnum("review_type", [
 ]);
 
 /** Review resolution status. */
-export const reviewStatusEnum = pgEnum("review_status", [
+export const reviewStatusEnum = sqliteEnum("review_status", [
   "pending",
   "accepted",
   "rejected",
@@ -55,13 +55,13 @@ export const reviewStatusEnum = pgEnum("review_status", [
 ]);
 
 /** Project status. */
-export const projectStatusEnum = pgEnum("project_status", [
+export const projectStatusEnum = sqliteEnum("project_status", [
   "active",
   "archived",
 ]);
 
 /** Event types for entity activity log. */
-export const entityEventTypeEnum = pgEnum("entity_event_type", [
+export const entityEventTypeEnum = sqliteEnum("entity_event_type", [
   "comment",
   "status_change",
   "reprocess",

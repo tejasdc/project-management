@@ -60,7 +60,7 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
       if (q.reviewType) where.push(eq(reviewQueue.reviewType, q.reviewType));
 
       const [row] = await db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: sql<number>`count(*)` })
         .from(reviewQueue)
         .where(where.length ? and(...where) : undefined);
 
@@ -107,8 +107,8 @@ export const reviewQueueRoutes = new Hono<AppEnv>()
       `;
 
       const entityGroupRank = sql<number>`case when ${reviewQueue.entityId} is null then 0 else 1 end`;
-      const projectKey = sql<string>`coalesce(${reviewQueue.projectId}::text, 'ffffffff-ffff-ffff-ffff-ffffffffffff')`;
-      const entityKey = sql<string>`coalesce(${reviewQueue.entityId}::text, '')`;
+      const projectKey = sql<string>`coalesce(${reviewQueue.projectId}, 'ffffffff-ffff-ffff-ffff-ffffffffffff')`;
+      const entityKey = sql<string>`coalesce(${reviewQueue.entityId}, '')`;
 
       const rows = await db
         .select()

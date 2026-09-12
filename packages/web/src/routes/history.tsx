@@ -1,3 +1,4 @@
+import { NoteProcessingState } from "../components/NoteProcessingState";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -297,9 +298,7 @@ function RawNotesTab() {
             <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-2 py-[2px] text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               {note.source ?? "unknown"}
             </span>
-            <Badge variant={note.processed ? "success" : "muted"}>
-              {note.processed ? "Processed" : "Pending"}
-            </Badge>
+            <NoteProcessingState note={note} />
             <span className="ml-auto font-mono text-[10px] text-[var(--text-tertiary)]">
               {formatTimestamp(note.capturedAt)}
             </span>

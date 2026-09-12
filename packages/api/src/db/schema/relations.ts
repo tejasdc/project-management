@@ -1,18 +1,18 @@
 // src/db/schema/relations.ts
 
 import { relations } from "drizzle-orm";
-import { users } from "./users.js";
-import { projects } from "./projects.js";
-import { epics } from "./epics.js";
-import { entities } from "./entities.js";
-import { rawNotes } from "./raw-notes.js";
-import { entitySources } from "./entity-sources.js";
-import { entityRelationships } from "./entity-relationships.js";
-import { tags } from "./tags.js";
-import { entityTags } from "./entity-tags.js";
-import { reviewQueue } from "./review-queue.js";
-import { entityEvents } from "./entity-events.js";
-import { apiKeys } from "./api-keys.js";
+import { users } from "./users";
+import { projects } from "./projects";
+import { epics } from "./epics";
+import { entities } from "./entities";
+import { rawNotes } from "./raw-notes";
+import { entitySources } from "./entity-sources";
+import { entityRelationships } from "./entity-relationships";
+import { tags } from "./tags";
+import { entityTags } from "./entity-tags";
+import { reviewQueue } from "./review-queue";
+import { entityEvents } from "./entity-events";
+import { apiKeys } from "./api-keys";
 
 // -- Users --
 export const usersRelations = relations(users, ({ many }) => ({

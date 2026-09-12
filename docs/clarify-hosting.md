@@ -1,190 +1,85 @@
-# Clarify.pm: product recovery and hosting
+# Clarify.pm hosting
 
-Investigated on 2026-09-11 from remote-box. Source repository:
-`tejasdc/project-management`, available at `/root/workspace/project-management`.
+The owner authorized Cloudflare migration and a fresh empty workspace on September
+11, 2026. The old Render Postgres resource was absent (owning-workspace list empty,
+full resource lookup 404); no verified export was found. Preserve any later recovered
+backup separately. It must never overwrite new captures.
 
-## Current decision
+## Architecture and costs
 
-Tejas's latest 2026-09-11 request supersedes the earlier Render-only decision:
-**migrate the full application to Cloudflare free-tier infrastructure**, preserving
-product behavior and recoverable data. See the [current research and proposed
-implementation](plans/2026-09-11-cloudflare-free-tier.md). The missing database's
-recovery versus an empty workspace remains an explicit owner decision; domain
-control also needs resolution. The migration is not yet implemented or deployed.
+The Cloudflare Worker serves frontend assets and forwards API requests to one
+SQLite-backed Workspace Durable Object. It owns relational data, processing jobs,
+rate limits and hibernating live connections. Alarms run extraction and organization.
+No paid Postgres, Redis or persistent worker instance is needed.
 
-The canonical URL remains `https://clarify.pm/`, including the portfolio link.
-The existing Render frontend still serves the marketing homepage from
-`packages/web/src/components/Homepage.tsx`. The Render evidence and procedures below
-describe that current deployment; the old Cloudflare comparison is historical.
+Workers/Durable Objects have free quotas shared with the account's other projects.
+No paid plan or subscription was enabled by this migration. Static assets bypass
+Worker execution. Idle WebSockets hibernate, and idle job processing has no timer.
+Anthropic inference remains separately charged through the existing key. R2 is not
+used: its included allowance would not provide a hard zero-charge storage limit.
 
-## What the project is
+The existing extraction model was retired; the compatible supported default is
+claude-sonnet-4-6. Existing prompts, tool schemas, evidence and review behavior remain.
 
-Clarify.pm is a project-management experiment built around quick, unstructured capture.
-The implemented pipeline stores a raw note, extracts **tasks, decisions, and insights**,
-and organizes them into projects and epics. Extracted items retain source evidence;
-uncertain suggestions go to review. The three-type model was deliberate: avoid turning
-every sentence into a collection of redundant entities.
+## URLs and access
 
-The source docs are `docs/project-management-agent.md`, `docs/frontend-views.md`, and
-`docs/extraction-prompts.md`. There was no README at the time of recovery. Selected
-product/design sections were read, not every line of these large documents.
+- Product: https://clarify.pm/
+- Cloudflare app/API: https://clarify-pm.thnkring.workers.dev/
+- Old API hostname: https://api.clarify.pm/ still needs DNS control.
 
-Archived February session summaries under
-`/root/transcript-archive/mac-claude-projects/-Users-tejasdc-workspace-project-management/`
-recover the original goals: capture without manual annotation, let agents organize,
-keep human review, and preserve the original material. In particular,
-`f257875a-ad4a-48a8-8afa-82f211c705f6/subagents/agent-acompact-b2a1c4.jsonl`
-and `agent-acompact-97bc98.jsonl` record the early product and hosting decisions.
-These are compacted session summaries, not complete original transcripts. The broader
-vision of tracking work evolution through git and agent activity is not represented
-as a working feature on the homepage.
+The domain currently delegates to ns1/ns2.dns-parking.com and is absent from the
+available Cloudflare zone list. Until DNS access is restored, the existing Render
+static frontend can serve the product URL with its VITE_API_URL rebuilt to point at
+Cloudflare. That static service adds no fixed backend hosting fee. It is mixed
+hosting; do not claim a completed all-Cloudflare domain migration.
 
-## Production investigation evidence (before homepage deployment)
+New registrations require the workspace invitation code. Each invited account sees
+the same workspace. The code is a Worker secret, never a frontend environment value.
+The owner creates their own account; migration acceptance accounts are clearly
+identified and their API keys are revoked after testing.
 
-| Surface | Observed result |
-| --- | --- |
-| `https://clarify.pm` | HTTP 200, PM Agent login screen, Render `rndr-id` response header. |
-| `https://api.clarify.pm/api/health` | Repeated timeouts; the longest was 55 seconds with zero HTTP response bytes after successful TCP/TLS. |
-| Direct Render API hostname | `pm-api-lxwo.onrender.com` also timed out. |
-| API DNS | CNAME points to `pm-api-lxwo.onrender.com`, then Render's origin. |
-| Authoritative DNS | `ns1.dns-parking.com` and `ns2.dns-parking.com`. |
-| Cloudflare account | Existing token lists chann.app, tejas.nyc, thnkr.ing and twochairs.club; clarify.pm is not visible. |
+## Deploy
 
-The frontend being up does **not** establish that login, capture, extraction, or data
-storage works. No root cause is confirmed. `server: cloudflare` reflects delivery
-infrastructure, not evidence that Clarify is hosted in Tejas's Cloudflare account.
+Use the canonical token/environment in ~/.config/cloudflare/deploy.env. Build shared
+and web, pass the API/native/browser checks, then run scripts/deploy-cloudflare.sh.
+Worker secrets are ANTHROPIC_API_KEY and REGISTRATION_CODE; never commit them or use
+Wrangler OAuth. All runtime data belongs to this Worker's own Workspace namespace.
 
-The new credential in `~/.config/render/clarify.env` accesses the owning **personal**
-workspace, `tea-d63tgvp4tr6s73a4e3q0`. Do not overwrite the separate IdeaFlow credential.
-Confirmed on September 11:
+Render control remains available with ~/.config/render/clarify.env (personal workspace,
+separate from IdeaFlow). The migration disabled and verified:
+- Blueprint exs-d63thkkr85hc73bfn9i0 autoSync=false.
+- API srv-d63tmipr0fns73bsbcu0 autoDeploy=no.
+- Worker srv-d64ftfogjchc739nejpg autoDeploy=no; it remains suspended.
 
-- `pm-web` (`srv-d63tlvhr0fns73bsb560`) is a static site on `main` with verified
-  `clarify.pm` and `www.clarify.pm`; www redirects to the apex. No DNS change is needed.
-- `pm-api` (`srv-d63tmipr0fns73bsbcu0`) is running and logging Redis connection refusals.
-- `pm-worker` (`srv-d64ftfogjchc739nejpg`) and `pm-redis`
-  (`red-d64fsbf5r7bs73af5u4g`) are suspended. Both were last updated June 5.
-- No Postgres instances are listed. The configured resource's full ID,
-  `dpg-d63tlvpr0fns73bsb5ag-a`, also returns 404. Archived Render metadata identifies
-  a free database created February 8 with `expiresAt` March 10. Expiry is likely;
-  the exact removal event is unconfirmed.
-- No completed dump or replacement database was found in this project's remote files
-  and archived sessions. The remaining local candidate is the laptop's ignored
-  `/Users/tejasdc/workspace/project-management/backups/` directory.
-- API and worker database, Redis, and Anthropic environment variables are present.
-  Presence is not evidence of validity. Login/capture/extraction acceptance is blocked.
+Existing static frontend srv-d63tlvhr0fns73bsb560 retains its verified clarify.pm/www
+domains and /* → /index.html rewrite. Set VITE_API_URL to the Cloudflare URL, rebuild,
+deploy the reviewed main commit and verify the actual canonical browser flow.
+render.yaml now contains only that static frontend. Do not manually sync the old
+Blueprint, resume the old paid worker/Redis, or recreate the absent database.
 
-Do not silently create an empty replacement database, restore over unknown data, or
-resume paid services. Recover an existing export if available; otherwise obtain the
-owner's decision about starting fresh and the resulting costs. Render's general
-[free database policy](https://render.com/docs/free#free-postgres) provides a 14-day
-grace period after expiry, not a verified recovery path for this instance.
+## Data, recovery and acceptance
 
-## Homepage source and temporary preview
+SQLite migrations apply inside the object before requests execute. Raw content and
+sourceMeta are stored together as ordered immutable UTF-8 pages. Capture pages,
+metadata, job intent and wake scheduling commit atomically. Reprocess creates a new
+generation; earlier in-flight AI results cannot commit over it. A finished extraction
+commits its next organization step, so process loss cannot strand an extracted note.
+Terminal processing failures remain visible and explicit reprocess retries them.
 
-`packages/web/src/components/Homepage.tsx` is the public homepage with a labeled worked example,
-keyboard-operable source highlighting, light/dark themes, self-hosted fonts, and no
-network-backed capture or sign-up flow. It makes no claim that the old app is healthy.
-It was published independently as Cloudflare Pages project `clarify-homepage`, at
-`https://clarify-homepage.pages.dev`, before the hosting correction. That temporary
-preview is not the canonical product URL. Do not continue deploying the homepage there.
-Its publication changed neither the existing app routes nor DNS nor user data.
+Before a release with data changes, preserve a Cloudflare SQLite Time Travel bookmark.
+Use the provider's documented point-in-time recovery API/tooling; restore only after
+identifying the exact namespace, object and bookmark, and preserving newer data.
+A previous Worker version can roll back compatible code; the missing Render database
+is not a valid application rollback. Never restore old data over new captures.
 
-The inspected `pm-web` build command is:
+Native acceptance covers registration/login, private user projections, deduplicated
+capture, oversized Unicode content/metadata, rollback on payload failure, extraction,
+organization, review, reprocess, retries, hibernation, revocation and restart during AI.
+Browser acceptance covers both desktop and phone in Chromium/WebKit on Linux.
+Live acceptance must exercise real Sonnet extraction and organization, review and
+reload persistence from the published app. Only then remove the homepage offline notice.
 
-```
-corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pm/shared build && pnpm --filter @pm/web build
-```
-
-The publish directory is `./packages/web/dist`. Its build filter covers `packages/web/**`,
-`packages/shared/**`, and `pnpm-lock.yaml`. Keeping the homepage inside `packages/web`
-makes subsequent homepage changes use that existing deployment path.
-
-The existing root route renders `Homepage.tsx` outside AuthGate; all other app routes
-retain AuthGate and the existing query/SSE providers. The homepage uses self-hosted
-fonts and a local React state for its illustrative selection; it makes no API calls.
-App-only Google font links load only on app routes. Static files under
-`packages/web/public/homepage/` are included by Vite's existing build. Render's
-`/*` → `/index.html` rewrite remains unchanged.
-
-Deploy through the existing frontend's main branch. Verify the canonical homepage,
-keyboard example, and direct app URLs. Rollback uses the prior frontend deployment;
-no DNS, rewrite, or backend rollback is involved. Do not redeploy the API to ship this
-page: its build runs migrations and seeding.
-
-**Blueprint constraint:** `exs-d63thkkr85hc73bfn9i0` has auto-sync enabled and still
-declares the missing database. Render's documented [Blueprint behavior](https://render.com/docs/infrastructure-as-code)
-recreates deleted resources on sync. Leave `render.yaml` unchanged and do not sync it
-until database recovery/replacement is decided. The homepage uses the existing frontend
-configuration and does not need a Blueprint change.
-
-The temporary Pages project was deleted after the Render homepage passed live checks
-on September 11; a subsequent Pages API lookup confirmed the project no longer exists.
-Never publish the repository root: it contains private code and operational documentation.
-
-The existing Render frontend deployed commit `e134ed170761f8ecf986d99a7d9a78d918a62204`
-as `dep-dai91hu743jc73e73qog`. `https://clarify.pm/` returns the new homepage, and
-`www.clarify.pm` redirects to it. Chromium and WebKit on Linux passed at 1440×1000 and
-390×844, both color schemes, including keyboard example interaction and no homepage
-API requests/storage writes. Direct project/entity/review/settings URLs retain the
-login gate in both engines. These checks do not establish working login or extraction:
-database recovery and the suspended Redis/worker remain unresolved.
-
-Docs-only and preparation commits use `[skip render]` until the actual deployment is
-inspected; this is Render's documented
-[skip mechanism](https://render.com/docs/deploys#skipping-an-auto-deploy).
-
-## Credential location
-
-Use `~/.config/render/clarify.env` on remote-box with `RENDER_API_KEY` set and file
-permissions `600`. Access to the owning personal workspace was confirmed. Keep tokens
-out of Slack and reports; share only the path. The separate IdeaFlow key cannot see
-these services. Render keys inherit their account's workspace memberships.
-[Create/manage API keys](https://dashboard.render.com/u/settings?add-api-key=),
-[authentication contract](https://api-docs.render.com/reference/authentication).
-
-`clarify.pm` and `api.clarify.pm` already point to Render. No DNS migration or DNS
-credentials are required merely to inspect the services or deploy to the existing site.
-The later Cloudflare request supersedes the earlier Redis/worker-resumption plan;
-leave those paid resources suspended. The existing Anthropic key passed a models
-lookup and tiny inference probe, but the app's retired Sonnet default needs a
-supported replacement. Perform full login/capture/extraction/organization/review
-and live-update acceptance on the Cloudflare target as described in the current
-plan. Domain cutover to Cloudflare does require DNS control for both hostnames.
-
-## Earlier Cloudflare assessment (superseded by current research)
-
-Yes in principle, but the full app needs adaptation rather than a hosting switch.
-
-| Current part | Cloudflare option | What would change |
-| --- | --- | --- |
-| Static React/Vite frontend | Workers static assets or Pages | Build and route configuration; API origin and CORS must match. |
-| Hono Node API | Workers | Request lifecycle, bindings, authentication hashing/native dependency compatibility, and database connections need review. |
-| Postgres + Drizzle | D1 for Cloudflare-owned storage | D1 uses SQLite semantics. Migrate schema, SQL, indexes, data and transactions; verify identifiers and source relationships survive. |
-| Keep Postgres temporarily | Hyperdrive | Connects to an existing Postgres database; it does not move that database onto Cloudflare. |
-| BullMQ + Redis worker | Cloudflare Queues and consumers | Port extraction/organization jobs, retries, deduplication and scheduling. Queues is not a BullMQ/Redis drop-in. |
-| Redis pub/sub for SSE | Durable Objects or another supported event distribution design | Preserve authenticated per-user subscriptions and cross-worker updates. |
-
-Containers may preserve some Node compatibility, but their ephemeral disks are not a
-durable Postgres plan. The appropriate migration depends on the actual database state,
-data volume, and remaining application requirements, which are not yet established.
-
-Before a full migration, recover target Render access and inventory/export the existing
-data, establish the working authentication and capture baseline, then review one complete
-migration design with rollback and acceptance checks. No production data migration,
-database replacement, service shutdown, or nameserver change was performed in this work.
-
-Official references: [React on Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/react/),
-[D1](https://developers.cloudflare.com/d1/),
-[Hyperdrive](https://developers.cloudflare.com/hyperdrive/),
-[Queues consumers](https://developers.cloudflare.com/queues/configuration/javascript-apis/),
-[Containers architecture](https://developers.cloudflare.com/containers/concepts/architecture/).
-
-## Visual asset provenance
-
-`packages/web/public/homepage/assets/notes-to-order.webp` was generated with the built-in image tool, then
-encoded to WebP. Prompt: an editorial, slightly overhead still life of loose off-white
-paper notes becoming three organized stacks on a dark graphite tabletop; tactile paper,
-soft oblique studio light, subtle amber/blue/sage tabs, no legible words, logos, computers,
-or interface. It is an atmospheric concept image, not a screenshot of the app.
-Bricolage Grotesque and DM Sans are self-hosted from Google Fonts under their included
-SIL Open Font Licenses.
+For the final DNS move, obtain the existing complete zone, add clarify.pm to the same
+Cloudflare account, preserve unrelated MX/TXT records, change registrar nameservers,
+then bind clarify.pm, www and api.clarify.pm to this Worker. Verify TLS, SPA deep links,
+authenticated API requests and browser live updates before retiring the static service.

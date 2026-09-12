@@ -1,4 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { inArray } from "../db/filters.js";
+import { and, eq } from "drizzle-orm";
 
 import type { ReviewSuggestion } from "@pm/shared";
 import { ENTITY_STATUSES } from "@pm/shared";
@@ -33,14 +34,14 @@ function pickSuggestion(opts: { status: ReviewStatus; ai: ReviewSuggestion; user
   return null;
 }
 
-async function appendEntityReviewEvent(tx: any, opts: { entityId: string; actorUserId: string; reviewId: string; reviewType: string; body: string; meta?: unknown }) {
-  await tx.insert(entityEvents).values({
+function appendEntityReviewEvent(tx: any, opts: { entityId: string; actorUserId: string; reviewId: string; reviewType: string; body: string; meta?: unknown }) {
+  tx.insert(entityEvents).values({
     entityId: opts.entityId,
     type: "comment",
     actorUserId: opts.actorUserId,
     body: opts.body,
     meta: { reviewId: opts.reviewId, reviewType: opts.reviewType, ...(opts.meta as any) } as any,
-  });
+  }).run();
 }
 
 export async function resolveReviewItem(opts: {
@@ -50,7 +51,7 @@ export async function resolveReviewItem(opts: {
   trainingComment?: string;
   resolvedByUserId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => {
     return resolveReviewItemTx(tx, opts);
   });
 }
@@ -64,17 +65,17 @@ export async function resolveReviewBatch(opts: {
   }>;
   resolvedByUserId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return db.transaction((tx) => {
     const items: any[] = [];
     for (const r of opts.resolutions) {
-      const res = await resolveReviewItemTx(tx, { ...r, resolvedByUserId: opts.resolvedByUserId });
+      const res = resolveReviewItemTx(tx, { ...r, resolvedByUserId: opts.resolvedByUserId });
       items.push(res.item);
     }
     return { items };
   });
 }
 
-async function resolveReviewItemTx(
+function resolveReviewItemTx(
   tx: any,
   opts: {
     id: string;
@@ -84,9 +85,9 @@ async function resolveReviewItemTx(
     resolvedByUserId: string;
   }
 ) {
-  const existing = await tx.query.reviewQueue.findFirst({
+  const existing = tx.query.reviewQueue.findFirst({
     where: (t: any, q: any) => and(eq(t.id, opts.id), eq(t.status, "pending")),
-  });
+  }).sync();
   if (!existing) throw notFound("review_queue_item", opts.id);
 
   const suggestion = pickSuggestion({ status: opts.status, ai: existing.aiSuggestion, user: opts.userResolution });
@@ -104,7 +105,7 @@ async function resolveReviewItemTx(
       const newType = suggestion?.suggestedType;
       if (!newType) throw badRequest("Missing suggestedType");
 
-      const ent = await tx.query.entities.findFirst({ where: (t: any, q: any) => eq(t.id, existing.entityId) });
+      const ent = tx.query.entities.findFirst({ where: (t: any, q: any) => eq(t.id, existing.entityId) }).sync();
       if (!ent) throw notFound("entity", existing.entityId);
 
       if (ent.type !== newType) {
@@ -116,14 +117,14 @@ async function resolveReviewItemTx(
           return parsed.success ? (ent.attributes ?? {}) : {};
         })();
 
-        await tx
+        tx
           .update(entities)
           .set({ type: newType, status: newStatus, attributes: attrs as any, updatedAt: now })
-          .where(eq(entities.id, existing.entityId));
+          .where(eq(entities.id, existing.entityId)).run();
 
         effects.updatedEntityIds.push(existing.entityId);
 
-        await appendEntityReviewEvent(tx, {
+        appendEntityReviewEvent(tx, {
           entityId: existing.entityId,
           actorUserId: opts.resolvedByUserId,
           reviewId: existing.id,
@@ -134,7 +135,7 @@ async function resolveReviewItemTx(
 
         // Auto-reject any other pending review items for this entity.
         // If the entity's type changed, project/epic/assignee/etc suggestions may no longer make sense.
-        const others = await tx
+        const others = tx
           .select({ id: reviewQueue.id })
           .from(reviewQueue)
           .where(
@@ -142,11 +143,11 @@ async function resolveReviewItemTx(
               eq(reviewQueue.entityId, existing.entityId),
               eq(reviewQueue.status, "pending")
             )
-          );
+          ).all();
 
         const otherIds = others.map((r: any) => r.id).filter((id: string) => id && id !== existing.id);
         if (otherIds.length > 0) {
-          await tx
+          tx
             .update(reviewQueue)
             .set({
               status: "rejected",
@@ -155,7 +156,7 @@ async function resolveReviewItemTx(
               userResolution: { explanation: "Auto-rejected due to entity type change" } as any,
               updatedAt: now,
             })
-            .where(and(inArray(reviewQueue.id, otherIds), eq(reviewQueue.status, "pending")));
+            .where(and(inArray(reviewQueue.id, otherIds), eq(reviewQueue.status, "pending"))).run();
           effects.autoResolvedReviewIds.push(...otherIds);
         }
       }
@@ -165,9 +166,9 @@ async function resolveReviewItemTx(
   if (existing.reviewType === "project_assignment") {
     if (!existing.entityId) throw badRequest("project_assignment review item missing entityId");
     const projectId = opts.status === "rejected" ? null : (suggestion?.suggestedProjectId ?? null);
-    await tx.update(entities).set({ projectId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    tx.update(entities).set({ projectId, updatedAt: now }).where(eq(entities.id, existing.entityId)).run();
     effects.updatedEntityIds.push(existing.entityId);
-    await appendEntityReviewEvent(tx, {
+    appendEntityReviewEvent(tx, {
       entityId: existing.entityId,
       actorUserId: opts.resolvedByUserId,
       reviewId: existing.id,
@@ -180,9 +181,9 @@ async function resolveReviewItemTx(
   if (existing.reviewType === "epic_assignment") {
     if (!existing.entityId) throw badRequest("epic_assignment review item missing entityId");
     const epicId = opts.status === "rejected" ? null : (suggestion?.suggestedEpicId ?? null);
-    await tx.update(entities).set({ epicId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    tx.update(entities).set({ epicId, updatedAt: now }).where(eq(entities.id, existing.entityId)).run();
     effects.updatedEntityIds.push(existing.entityId);
-    await appendEntityReviewEvent(tx, {
+    appendEntityReviewEvent(tx, {
       entityId: existing.entityId,
       actorUserId: opts.resolvedByUserId,
       reviewId: existing.id,
@@ -195,9 +196,9 @@ async function resolveReviewItemTx(
   if (existing.reviewType === "assignee_suggestion") {
     if (!existing.entityId) throw badRequest("assignee_suggestion review item missing entityId");
     const assigneeId = opts.status === "rejected" ? null : (suggestion?.suggestedAssigneeId ?? null);
-    await tx.update(entities).set({ assigneeId, updatedAt: now }).where(eq(entities.id, existing.entityId));
+    tx.update(entities).set({ assigneeId, updatedAt: now }).where(eq(entities.id, existing.entityId)).run();
     effects.updatedEntityIds.push(existing.entityId);
-    await appendEntityReviewEvent(tx, {
+    appendEntityReviewEvent(tx, {
       entityId: existing.entityId,
       actorUserId: opts.resolvedByUserId,
       reviewId: existing.id,
@@ -213,7 +214,7 @@ async function resolveReviewItemTx(
       const duplicateEntityId = suggestion?.duplicateEntityId;
       if (!duplicateEntityId) throw badRequest("Missing duplicateEntityId");
 
-      const [edge] = await tx
+      const [edge] = tx
         .insert(entityRelationships)
         .values({
           sourceId: existing.entityId,
@@ -221,11 +222,11 @@ async function resolveReviewItemTx(
           relationshipType: "duplicate_of",
           metadata: { createdBy: "user", reason: suggestion?.explanation, confidence: suggestion?.similarityScore } as any,
         })
-        .returning({ id: entityRelationships.id });
+        .returning({ id: entityRelationships.id }).all();
 
       effects.createdRelationshipId = edge?.id;
 
-      await appendEntityReviewEvent(tx, {
+      appendEntityReviewEvent(tx, {
         entityId: existing.entityId,
         actorUserId: opts.resolvedByUserId,
         reviewId: existing.id,
@@ -244,7 +245,7 @@ async function resolveReviewItemTx(
       const projectId = suggestion?.proposedEpicProjectId ?? existing.projectId;
       if (!name) throw badRequest("Missing proposedEpicName");
 
-      const [epic] = await tx
+      const [epic] = tx
         .insert(epics)
         .values({
           projectId,
@@ -252,7 +253,7 @@ async function resolveReviewItemTx(
           description,
           createdBy: "ai_suggestion",
         } as any)
-        .returning({ id: epics.id });
+        .returning({ id: epics.id }).all();
 
       effects.createdEpicId = epic?.id;
 
@@ -262,10 +263,10 @@ async function resolveReviewItemTx(
         const uniqueIds = Array.from(new Set(candidateEntityIds)).filter((id) => typeof id === "string" && id.length > 0);
         for (const entityId of uniqueIds) {
           // Defensive: only create if the entity exists.
-          const ent = await tx.query.entities.findFirst({ where: (t: any, q: any) => eq(t.id, entityId) });
+          const ent = tx.query.entities.findFirst({ where: (t: any, q: any) => eq(t.id, entityId) }).sync();
           if (!ent) continue;
 
-          await tx
+          tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -275,7 +276,7 @@ async function resolveReviewItemTx(
               aiSuggestion: { suggestedEpicId: epic.id, explanation: `Assign to newly created epic '${name}'` } as any,
               aiConfidence: existing.aiConfidence,
             })
-            .onConflictDoNothing();
+            .onConflictDoNothing().run();
         }
       }
     }
@@ -287,10 +288,10 @@ async function resolveReviewItemTx(
       const description = suggestion?.proposedProjectDescription ?? null;
       if (!name) throw badRequest("Missing proposedProjectName");
 
-      const [project] = await tx
+      const [project] = tx
         .insert(projects)
         .values({ name, description })
-        .returning({ id: projects.id });
+        .returning({ id: projects.id }).all();
 
       effects.createdProjectId = project?.id;
 
@@ -300,17 +301,17 @@ async function resolveReviewItemTx(
         const uniqueIds = Array.from(new Set(candidateEntityIds))
           .filter((id) => typeof id === "string" && id.length > 0);
         for (const entityId of uniqueIds) {
-          const ent = await tx.query.entities.findFirst({
+          const ent = tx.query.entities.findFirst({
             where: (t: any, q: any) => eq(t.id, entityId),
-          });
+          }).sync();
           if (!ent) continue;
 
           // Remove any stale pending project_assignment for this entity
-          await tx.delete(reviewQueue).where(
+          tx.delete(reviewQueue).where(
             and(eq(reviewQueue.entityId, entityId), eq(reviewQueue.reviewType, "project_assignment"), eq(reviewQueue.status, "pending"))
-          );
+          ).run();
 
-          await tx
+          tx
             .insert(reviewQueue)
             .values({
               entityId,
@@ -323,14 +324,14 @@ async function resolveReviewItemTx(
               } as any,
               aiConfidence: existing.aiConfidence,
             })
-            .onConflictDoNothing();
+            .onConflictDoNothing().run();
         }
       }
     }
   }
 
   // Update the review item itself
-  const [item] = await tx
+  const [item] = tx
     .update(reviewQueue)
     .set({
       status: opts.status,
@@ -341,7 +342,7 @@ async function resolveReviewItemTx(
       updatedAt: now,
     })
     .where(and(eq(reviewQueue.id, opts.id), eq(reviewQueue.status, "pending")))
-    .returning();
+    .returning().all();
 
   if (!item) throw conflict("Review item is no longer pending");
 

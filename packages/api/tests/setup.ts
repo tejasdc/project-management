@@ -1,25 +1,9 @@
-import { beforeEach } from "vitest";
-import { sql as dsql } from "drizzle-orm";
-
-beforeEach(async () => {
-  const { db } = await import("../src/db/index.js");
-  // Wipe all app tables for isolation.
-  await db.execute(
-    dsql`
-      truncate table
-        api_keys,
-        entity_events,
-        entity_relationships,
-        entity_sources,
-        entity_tags,
-        review_queue,
-        entities,
-        epics,
-        projects,
-        raw_notes,
-        tags,
-        users
-      cascade
-    `
-  );
+import { beforeEach, afterAll, vi } from "vitest";
+import { resetDatabase, sqlite } from "./runtime-fixture.js";
+vi.mock("../src/runtime.js", async () => {
+  const actual = await vi.importActual<typeof import("../src/runtime.js")>("../src/runtime.js");
+  const { runtime } = await import("./runtime-fixture.js");
+  return { ...actual, getRuntime: () => runtime };
 });
+beforeEach(resetDatabase);
+afterAll(() => sqlite.close());

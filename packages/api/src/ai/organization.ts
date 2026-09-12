@@ -1,9 +1,9 @@
+import { getRuntime } from "../runtime.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 import { organizationResultSchema } from "./schemas/organization-schema.js";
 
-const ORGANIZATION_MODEL = process.env.ANTHROPIC_ORGANIZATION_MODEL ?? "claude-sonnet-4-20250514";
 export const ORGANIZATION_PROMPT_VERSION = "v1";
 
 // Few-shot example from docs/extraction-prompts.md (Phase B).
@@ -198,14 +198,8 @@ Call the organize_entities tool with the structured output. Do not produce any o
 ${ORGANIZATION_FEW_SHOT_EXAMPLE}
 `.trim();
 
-let client: Anthropic | null = null;
-
 function getClient() {
-  if (client) return client;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");
-  client = new Anthropic({ apiKey });
-  return client;
+  return new Anthropic({ apiKey: getRuntime().env.ANTHROPIC_API_KEY, maxRetries: 0, timeout: 120_000 });
 }
 
 export type ProjectContext = {
@@ -237,6 +231,7 @@ export async function organizeEntities(opts: {
   rawNoteSource: string;
   sourceMeta?: Record<string, unknown>;
 }) {
+  const ORGANIZATION_MODEL = getRuntime().env.AI_MODEL ?? "claude-sonnet-4-6";
   const userMessage = [
     `## Extracted Entities`,
     "```json",

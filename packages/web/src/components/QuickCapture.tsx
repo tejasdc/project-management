@@ -1,3 +1,4 @@
+import { NoteProcessingState } from "./NoteProcessingState";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ type RawNote = {
   content: string;
   source: string;
   processed: boolean;
+  processingError?: string | null;
   processedAt: string | null;
   capturedAt: string;
 };
@@ -147,17 +149,7 @@ function RecentCaptureItem({ note, index }: { note: RawNote; index: number }) {
             className="w-[2px] h-[2px] rounded-full bg-[var(--border-medium)]"
             aria-hidden="true"
           />
-          {isProcessing ? (
-            <span className="inline-flex items-center gap-[5px] font-mono text-[11px] font-medium px-2 py-[2px] rounded-full leading-[1.4] text-[var(--accent-insight)] bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.15)]">
-              <Spinner />
-              Processing&hellip;
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-[5px] font-mono text-[11px] font-medium px-2 py-[2px] rounded-full leading-[1.4] text-[var(--confidence-high)] bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.15)]">
-              <CheckIcon />
-              Processed
-            </span>
-          )}
+          <NoteProcessingState note={note} />
           {/* Entity pills are shown per-note only when processed. Since raw_notes don't carry entity types,
               we show source tag instead, matching standalone mockup style */}
         </div>

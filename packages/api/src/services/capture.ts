@@ -1,131 +1,48 @@
 import { and, eq } from "drizzle-orm";
-
 import type { NoteSource, SourceMeta } from "@pm/shared";
 import { db } from "../db/index.js";
-import { rawNotes } from "../db/schema/index.js";
-import { serviceUnavailable } from "../lib/errors.js";
-import { logger } from "../lib/logger.js";
-import { DEFAULT_JOB_OPTS, getNotesExtractQueue, getNotesReprocessQueue } from "../jobs/queue.js";
-
+import { rawNotes, processingJobs, entitySources, entityEvents } from "../db/schema/index.js";
+import { getRuntime } from "../runtime.js";
+import { hydrateNote, writeNotePayload } from "./note-payload.js";
+import { tryPublishEvent } from "./events.js";
 export type CaptureNoteInput = {
-  content: string;
-  source: NoteSource;
-  sourceMeta?: SourceMeta;
-  capturedAt?: string;
-  externalId?: string;
+  content: string; source: NoteSource; sourceMeta?: SourceMeta; capturedAt?: string; externalId?: string;
 };
-
-function isUniqueViolation(err: unknown) {
-  // Check both the error itself and its cause for the Postgres unique violation code.
-  // Drizzle v0.45+ wraps the original Postgres error in a DrizzleQueryError,
-  // so the code "23505" may be on err.cause rather than err directly.
-  if (typeof err !== "object" || err === null) return false;
-  if ("code" in err && (err as any).code === "23505") return true;
-  if ("cause" in err && typeof (err as any).cause === "object" && (err as any).cause !== null) {
-    return (err as any).cause.code === "23505";
-  }
-  return false;
-}
-
 export async function captureNote(opts: { input: CaptureNoteInput; capturedByUserId: string }) {
   const { input, capturedByUserId } = opts;
-
-  const capturedAt = input.capturedAt ? new Date(input.capturedAt) : undefined;
-
-  const values = {
-    content: input.content,
-    source: input.source,
-    sourceMeta: input.sourceMeta,
-    externalId: input.externalId,
-    capturedBy: capturedByUserId,
-    ...(capturedAt ? { capturedAt } : {}),
-  };
-
-  let note: typeof rawNotes.$inferSelect;
-  let deduped = false;
-  const jitter = () => Math.floor(Math.random() * 500);
-
-  if (input.externalId) {
-    try {
-      const [row] = await db.insert(rawNotes).values(values).returning();
-      note = row!;
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
-
-      const existing = await db.query.rawNotes.findFirst({
-        where: (t, { and, eq }) => and(eq(t.source, input.source), eq(t.externalId, input.externalId!)),
-      });
-      if (!existing) throw err;
-
-      note = existing;
-      deduped = true;
+  return getRuntime().mutateAndWake(() => db.transaction(tx => {
+    if (input.externalId) {
+      const existing = tx.query.rawNotes.findFirst({
+        where: and(eq(rawNotes.source, input.source), eq(rawNotes.externalId, input.externalId)),
+      }).sync();
+      if (existing) return { note: hydrateNote(existing), deduped: true };
     }
-  } else {
-    const [row] = await db.insert(rawNotes).values(values).returning();
-    note = row!;
-  }
-
-  if (!deduped && !note.processed) {
-    const queue = getNotesExtractQueue();
-    if (!queue) {
-      logger.warn({ rawNoteId: note.id }, "Redis unavailable — note saved but extraction not queued");
-    } else {
-      try {
-        await queue.add(
-          "notes-extract",
-          { rawNoteId: note.id },
-          {
-            ...DEFAULT_JOB_OPTS,
-            jobId: note.id,
-            attempts: 5,
-            backoff: { type: "exponential", delay: 2000 + jitter() },
-          }
-        );
-      } catch (err) {
-        await db
-          .update(rawNotes)
-          .set({ processingError: `enqueue_failed: ${err instanceof Error ? err.message : String(err)}` })
-          .where(eq(rawNotes.id, note.id));
-        throw serviceUnavailable("Failed to enqueue note extraction");
-      }
-    }
-  }
-
-  return { note, deduped };
+    const note = tx.insert(rawNotes).values({
+      content: "", sourceMeta: null, source: input.source, externalId: input.externalId,
+      capturedBy: capturedByUserId, capturedAt: input.capturedAt ? new Date(input.capturedAt) : new Date(),
+    }).returning().get();
+    writeNotePayload(tx, note.id, input.content, input.sourceMeta);
+    tx.insert(processingJobs).values({
+      rawNoteId: note.id, generation: crypto.randomUUID(), step: "extract", nextAttempt: Date.now(),
+    }).run();
+    return { note: { ...note, content: input.content, sourceMeta: input.sourceMeta ?? null }, deduped: false };
+  }));
 }
-
 export async function markNoteForReprocess(opts: { rawNoteId: string; requestedByUserId?: string }) {
-  const { rawNoteId, requestedByUserId } = opts;
-  const jitter = () => Math.floor(Math.random() * 500);
-
-  const note = await db.query.rawNotes.findFirst({
-    where: (t, { eq }) => eq(t.id, rawNoteId),
-  });
-  if (!note) return null;
-
-  const queue = getNotesReprocessQueue();
-  if (!queue) {
-    throw serviceUnavailable("Redis unavailable — cannot reprocess notes");
-  }
-
-  try {
-    await queue.add(
-      "notes-reprocess",
-      { rawNoteId, requestedByUserId },
-      {
-        ...DEFAULT_JOB_OPTS,
-        jobId: rawNoteId,
-        attempts: 3,
-        backoff: { type: "exponential", delay: 2000 + jitter() },
-      }
-    );
-  } catch (err) {
-    await db
-      .update(rawNotes)
-      .set({ processingError: `enqueue_failed: ${err instanceof Error ? err.message : String(err)}` })
-      .where(eq(rawNotes.id, rawNoteId));
-    throw serviceUnavailable("Failed to enqueue note reprocessing");
-  }
-
+  const note = await getRuntime().mutateAndWake(() => db.transaction(tx => {
+    const note = tx.query.rawNotes.findFirst({ where: eq(rawNotes.id, opts.rawNoteId) }).sync();
+    if (!note) return null;
+    tx.update(rawNotes).set({ processed: false, processedAt: null, processingError: null })
+      .where(eq(rawNotes.id, note.id)).run();
+    const job = { rawNoteId: note.id, generation: crypto.randomUUID(), step: "extract" as const,
+      status: "pending" as const, attempts: 0, nextAttempt: Date.now(), entityIds: [], error: null };
+    tx.insert(processingJobs).values(job).onConflictDoUpdate({ target: processingJobs.rawNoteId, set: job }).run();
+    for (const link of tx.select().from(entitySources).where(eq(entitySources.rawNoteId, note.id)).all()) {
+      tx.insert(entityEvents).values({ entityId: link.entityId, rawNoteId: note.id,
+        type: "reprocess", actorUserId: opts.requestedByUserId, body: "Source note queued for reprocessing" }).run();
+    }
+    return hydrateNote(note);
+  }));
+  if (note) await tryPublishEvent("raw_note:created", { id: note.id });
   return note;
 }

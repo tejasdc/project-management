@@ -36,3 +36,9 @@ backups/
 /.worktree-env
 /.wt/
 /tmp/
+
+.wrangler/
+.dev.vars
+.dev.vars.*
+playwright-report/
+test-results/

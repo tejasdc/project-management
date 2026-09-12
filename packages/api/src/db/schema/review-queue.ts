@@ -1,17 +1,17 @@
 // src/db/schema/review-queue.ts
 
-import { pgTable, uuid, text, real, timestamp, jsonb, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { enumCheck, sqliteTable, uuid, text, real, timestamp, jsonb, index, uniqueIndex, check } from "../columns";
 import { sql } from "drizzle-orm";
-import { reviewTypeEnum, reviewStatusEnum } from "./enums.js";
-import { entities } from "./entities.js";
-import { projects } from "./projects.js";
-import { users } from "./users.js";
-import type { ReviewSuggestion } from "./types.js";
+import { reviewTypeEnum, reviewStatusEnum } from "./enums";
+import { entities } from "./entities";
+import { projects } from "./projects";
+import { users } from "./users";
+import type { ReviewSuggestion } from "./types";
 
-export const reviewQueue = pgTable(
+export const reviewQueue = sqliteTable(
   "review_queue",
   {
-    id: uuid().primaryKey().defaultRandom(),
+    id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
     entityId: uuid("entity_id")
       .references(() => entities.id, { onDelete: "cascade" }),
     projectId: uuid("project_id")
@@ -31,10 +31,12 @@ export const reviewQueue = pgTable(
     // Training comment for DSPy feedback loop
     trainingComment: text("training_comment"),
 
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
   },
   (table) => [
+    enumCheck("review_queue_reviewType_values", table.reviewType),
+    enumCheck("review_queue_status_values", table.status),
     // The review UI's primary query: "all pending review items, newest first"
     index("review_queue_pending_idx")
       .on(table.createdAt)

@@ -1,9 +1,9 @@
+import { getRuntime } from "../runtime.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 import { extractionResultSchema } from "./schemas/extraction-schema.js";
 
-const EXTRACTION_MODEL = process.env.ANTHROPIC_EXTRACTION_MODEL ?? "claude-sonnet-4-20250514";
 export const EXTRACTION_PROMPT_VERSION = "v1";
 
 // Few-shot examples from docs/extraction-prompts.md (Phase A).
@@ -315,14 +315,8 @@ Call the extract_entities tool with the structured output. Do not produce any ot
 ${EXTRACTION_FEW_SHOT_EXAMPLES}
 `.trim();
 
-let client: Anthropic | null = null;
-
 function getClient() {
-  if (client) return client;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");
-  client = new Anthropic({ apiKey });
-  return client;
+  return new Anthropic({ apiKey: getRuntime().env.ANTHROPIC_API_KEY, maxRetries: 0, timeout: 120_000 });
 }
 
 export async function extractEntities(opts: {
@@ -331,6 +325,7 @@ export async function extractEntities(opts: {
   capturedAt: string;
   sourceMeta?: Record<string, unknown>;
 }) {
+  const EXTRACTION_MODEL = getRuntime().env.AI_MODEL ?? "claude-sonnet-4-6";
   const userMessage = [
     `## Raw Note`,
     `- Source: ${opts.rawNoteSource}`,

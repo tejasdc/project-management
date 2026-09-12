@@ -1,9 +1,9 @@
 // src/db/schema/tags.ts
 
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { sqliteTable, uuid, text, timestamp } from "../columns";
 
-export const tags = pgTable("tags", {
-  id: uuid().primaryKey().defaultRandom(),
+export const tags = sqliteTable("tags", {
+  id: uuid().primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text().notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
 });

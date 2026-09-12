@@ -1,10 +1,10 @@
 // src/db/schema/entity-tags.ts
 
-import { pgTable, uuid, timestamp, primaryKey } from "drizzle-orm/pg-core";
-import { entities } from "./entities.js";
-import { tags } from "./tags.js";
+import { sqliteTable, uuid, timestamp, primaryKey } from "../columns";
+import { entities } from "./entities";
+import { tags } from "./tags";
 
-export const entityTags = pgTable(
+export const entityTags = sqliteTable(
   "entity_tags",
   {
     entityId: uuid("entity_id")
@@ -13,7 +13,7 @@ export const entityTags = pgTable(
     tagId: uuid("tag_id")
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     primaryKey({ columns: [table.entityId, table.tagId] }),

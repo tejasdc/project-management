@@ -1,3 +1,4 @@
+import { getRuntime } from "../runtime.js";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
@@ -6,13 +7,14 @@ import { and, eq } from "drizzle-orm";
 import type { AppEnv } from "../types/env.js";
 import { db } from "../db/index.js";
 import { apiKeys, users } from "../db/schema/index.js";
-import { notFound } from "../lib/errors.js";
-import { generateApiKey, hashPassword, verifyPassword } from "../services/auth.js";
+import { notFound, unauthorized } from "../lib/errors.js";
+import { generateApiKey, hashPassword, verifyPassword, publicUser } from "../services/auth.js";
 
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email().max(255),
   password: z.string().min(8).max(128),
+  registrationCode: z.string().min(1),
 });
 
 const createApiKeySchema = z.object({
@@ -36,6 +38,8 @@ export const authRoutes = new Hono<AppEnv>()
     }),
     async (c) => {
       const { name, email: rawEmail, password } = c.req.valid("json");
+      const expectedCode = getRuntime().env.REGISTRATION_CODE;
+      if (!expectedCode || c.req.valid("json").registrationCode !== expectedCode) throw unauthorized("Invalid workspace invitation code");
       const email = rawEmail.trim().toLowerCase();
 
       // Check if email already taken
@@ -51,18 +55,15 @@ export const authRoutes = new Hono<AppEnv>()
 
       const pwHash = await hashPassword(password);
 
-      const [user] = await db
-        .insert(users)
-        .values({ name, email, passwordHash: pwHash })
-        .returning();
-
       const { plaintextKey, keyHash } = await generateApiKey();
-
-      await db.insert(apiKeys).values({
-        userId: user!.id,
-        name: "default",
-        keyHash,
+      const user = db.transaction(tx => {
+        const row = tx.insert(users).values({ name, email, passwordHash: pwHash })
+          .onConflictDoNothing({ target: users.email }).returning().get();
+        if (!row) return null;
+        tx.insert(apiKeys).values({ userId: row.id, name: "default", keyHash }).run();
+        return row;
       });
+      if (!user) return c.json({ error: { code: "CONFLICT", message: "Email already registered", status: 409 } }, 409);
 
       return c.json({ user: { id: user!.id, name: user!.name, email: user!.email }, apiKey: plaintextKey }, 201);
     }
@@ -106,7 +107,7 @@ export const authRoutes = new Hono<AppEnv>()
     }
   )
   .get("/me", (c) => {
-    return c.json({ user: c.get("user") });
+    return c.json({ user: publicUser(c.get("user")) });
   })
   .post(
     "/api-keys",
@@ -160,6 +161,7 @@ export const authRoutes = new Hono<AppEnv>()
         .returning({ id: apiKeys.id });
 
       if (!row) throw notFound("api_key", id);
+      getRuntime().revokeSockets(id);
       return c.json({ ok: true });
     }
   );
