@@ -68,8 +68,10 @@ only the existing free static frontend, pending complete DNS cutover.
 
 Publish packages/web/dist only. Homepage: packages/web/src/components/Homepage.tsx,
 assets: packages/web/public/homepage/. The example is illustrative, never an API call.
-The root is public; app routes retain AuthGate. Remove the offline notice only with
-live login/capture/extraction acceptance. A frontend HTTP 200 is insufficient.
+The root is public; app routes retain AuthGate. Canonical live acceptance passed on
+September 11, 2026: login/capture, real Sonnet extraction and organization, review,
+source persistence and live updates. The homepage now links to Open workspace.
+A frontend HTTP 200 alone is insufficient for subsequent runtime releases.
 
 ## Verification and worktrees
 

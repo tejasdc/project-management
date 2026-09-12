@@ -15,10 +15,14 @@ human review. The canonical product address is https://clarify.pm/.
 
 The owner explicitly authorized a fresh empty workspace/new login. SQLite Durable
 Objects and alarms replace paid Postgres/Redis/worker services. Render Blueprint
-auto-sync and old API/worker auto-deploys are disabled. Local API and native runtime
-verification are passing; publication and live acceptance are still underway.
+auto-sync and old API/worker auto-deploys are disabled. The migration is published:
+89 API tests, 10 native runtime tests and four local browser configurations passed.
+Real AI capture, organization and review passed from clarify.pm, followed by live
+login, saved-note and WebSocket checks in Chromium/WebKit at desktop/phone sizes.
 
 Until registrar/DNS access is available, the existing free Render static frontend
-can preserve clarify.pm using the Cloudflare API. api.clarify.pm remains separate
+preserves clarify.pm using the Cloudflare API. api.clarify.pm remains separate
 DNS compatibility work. Do not change the portfolio to a temporary URL.
 The personal-site entry remains controlled by .publish.json through ship-to-site.
+The original prd.json is also a historical implementation checklist; it must not
+restore retired infrastructure or override the current runtime instructions.

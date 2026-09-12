@@ -2,8 +2,12 @@
 
 ## Status and authority
 
-Implementation and local verification underway, September 11, 2026. **Not yet
-deployed.** Tejas's later request authorizes migration to Cloudflare free-tier
+Published and verified, September 11, 2026 (September 12 UTC). The Cloudflare backend
+and canonical clarify.pm app passed real AI capture, organization, review and live
+browser acceptance. The domain retains its existing free Render static frontend
+until registrar/DNS control is available; api.clarify.pm is still pending.
+Current operational authority is [the hosting runbook](../clarify-hosting.md).
+Tejas's later request authorizes migration to Cloudflare free-tier
 infrastructure and supersedes the earlier request to keep Render. Preserve the
 existing product; stop for decisions that materially change behavior or data.
 
@@ -16,6 +20,10 @@ Implementation refinements: keep all storage inside SQLite. Store each immutable
 Gate new registrations with a workspace invitation code delivered to the owner. Preserve the shared trusted-team workspace; explicitly project safe user fields in every response, including /users, user creation and /auth/me. Password hashes and API-key hashes never cross that response boundary. The existing login/API-key interface and Sonnet extraction contract remain intact.
 
 ## Workload and required behavior
+
+The remaining sections preserve the original research snapshot at commit fd16157,
+including then-current paths, provider state and preconditions. They explain the
+decision; the implemented runtime and completed acceptance above supersede them.
 
 This is a hobby project used by its owner/a small trusted team. The current code
 has one shared collection of projects and entities, not separate tenant databases.

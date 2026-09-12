@@ -15,7 +15,7 @@ export function Homepage() {
       <a className="wordmark" href="/" aria-label="Clarify.pm home">Clarify<span>.pm</span></a>
       <nav aria-label="Main navigation">
         <a href="#idea">The idea</a>
-        <a href="#example">Explore an example <span aria-hidden="true">↗</span></a>
+        <a href="/projects">Open workspace <span aria-hidden="true">↗</span></a>
       </nav>
     </header>
     <main id="main">
@@ -92,7 +92,6 @@ export function Homepage() {
       </section>
       <section className="closing wrap" aria-label="About Clarify.pm">
         <p>An experiment in project management<br />that starts with what you already write.</p>
-        <p>The workspace is temporarily offline. You can explore the example above.</p>
         <a href="https://tejas.nyc/">A project by Tejas <span aria-hidden="true">↗</span></a>
       </section>
     </main>

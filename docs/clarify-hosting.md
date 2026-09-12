@@ -5,6 +5,20 @@ The owner authorized Cloudflare migration and a fresh empty workspace on Septemb
 full resource lookup 404); no verified export was found. Preserve any later recovered
 backup separately. It must never overwrite new captures.
 
+Published and verified September 11, 2026 (September 12 UTC). Runtime source:
+ca4943df3ec1335c020b33684773d4fd9963b618. Cloudflare namespace:
+c1b400df5e104604980b3aacff1e61b9 (clarify-pm_Workspace, use_sqlite=true).
+The first canonical frontend deployment was dep-daiakaad0e5s73fvhfqg.
+GitHub CI passed. Local gates: 89 API tests, 10 native runtime tests, all package
+typechecks, web build and four browser configurations.
+
+Live acceptance from https://clarify.pm passed real Sonnet capture/extraction and
+organization, source links, project assignment and human review. Login, persistent
+AI note, live WebSocket updates and logout then passed Chromium and WebKit on Linux
+at 1440×1000 and 390×844. The homepage offline notice was removed after acceptance.
+Verification uses a clearly named migration account/project; its immutable test note
+remains release evidence, its projects are archived and its API keys are revoked.
+
 ## Architecture and costs
 
 The Cloudflare Worker serves frontend assets and forwards API requests to one
@@ -29,7 +43,7 @@ claude-sonnet-4-6. Existing prompts, tool schemas, evidence and review behavior 
 
 The domain currently delegates to ns1/ns2.dns-parking.com and is absent from the
 available Cloudflare zone list. Until DNS access is restored, the existing Render
-static frontend can serve the product URL with its VITE_API_URL rebuilt to point at
+static frontend serves the product URL with its VITE_API_URL rebuilt to point at
 Cloudflare. That static service adds no fixed backend hosting fee. It is mixed
 hosting; do not claim a completed all-Cloudflare domain migration.
 
