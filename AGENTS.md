@@ -57,7 +57,9 @@ Canonical product URL: https://clarify.pm/; keep the portfolio link there.
 Cloudflare target: clarify-pm.thnkring.workers.dev. The complete app runs in that
 Worker. While registrar/DNS access is unavailable, the existing free Render static
 frontend can preserve clarify.pm with VITE_API_URL pointing to Cloudflare.
-This does not complete the api.clarify.pm DNS migration. See docs/clarify-hosting.md.
+The Cloudflare zone now exists but remains pending; Hostinger access will come through
+the owner's credential-sharing website. This does not complete the api.clarify.pm
+DNS migration. See docs/clarify-hosting.md for the zone and nameserver handoff.
 
 Use only ~/.config/cloudflare/deploy.env for deployment credentials.
 Render personal credentials: ~/.config/render/clarify.env. Existing static service:

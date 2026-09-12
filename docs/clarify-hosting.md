@@ -41,8 +41,15 @@ claude-sonnet-4-6. Existing prompts, tool schemas, evidence and review behavior 
 - Cloudflare app/API: https://clarify-pm.thnkring.workers.dev/
 - Old API hostname: https://api.clarify.pm/ still needs DNS control.
 
-The domain currently delegates to ns1/ns2.dns-parking.com and is absent from the
-available Cloudflare zone list. Until DNS access is restored, the existing Render
+The domain currently delegates to ns1/ns2.dns-parking.com. On September 12, 2026,
+the owner extended the existing Cloudflare token's permissions and zone creation
+succeeded. Zone 50540e5498009dda9b9cb0f9f8b47a43 is on the Free Website plan, pending
+activation, with assigned nameservers chuck.ns.cloudflare.com and
+nena.ns.cloudflare.com. Its DNS record list is currently empty: copy and verify the
+complete existing zone before changing nameservers. Public DNS still uses Hostinger.
+
+The owner will supply Hostinger access through a separately built credential-sharing
+website. That access has not yet been provided. Until it is available, the existing Render
 static frontend serves the product URL with its VITE_API_URL rebuilt to point at
 Cloudflare. That static service adds no fixed backend hosting fee. It is mixed
 hosting; do not claim a completed all-Cloudflare domain migration.
@@ -93,7 +100,9 @@ Browser acceptance covers both desktop and phone in Chromium/WebKit on Linux.
 Live acceptance must exercise real Sonnet extraction and organization, review and
 reload persistence from the published app. Only then remove the homepage offline notice.
 
-For the final DNS move, obtain the existing complete zone, add clarify.pm to the same
-Cloudflare account, preserve unrelated MX/TXT records, change registrar nameservers,
+For the final DNS move, use Hostinger access delivered through the owner's
+credential-sharing website to obtain the complete existing zone. Populate the pending
+Cloudflare zone while preserving unrelated MX/TXT records, verify the copied records,
+change registrar nameservers,
 then bind clarify.pm, www and api.clarify.pm to this Worker. Verify TLS, SPA deep links,
 authenticated API requests and browser live updates before retiring the static service.
