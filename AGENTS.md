@@ -26,6 +26,9 @@ External AI calls run outside transactions. Preserve generation checks before co
 AI results. Commit extraction results and organization intent together. Capture and
 reprocess use mutateAndWake: SQLite writes and the alarm share a storage transaction.
 Alarms reconcile their next wake transactionally and stop when no work remains.
+Epic suggestions must reference an active project supplied to the model; discard
+unknown project IDs before either automatic creation or human review. New-project
+suggestions use entityIndices and have no temporary-ID contract.
 
 Immutable note payloads (content plus sourceMeta) are UTF-8 document pages, ordered
 by note ID/page. Concatenate bytes before decoding. The API hydrates the original

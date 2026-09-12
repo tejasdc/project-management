@@ -3,13 +3,15 @@ import { Miniflare, Response as WorkerResponse } from "miniflare";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
+import type { OrganizationResult } from "../src/ai/schemas/organization-schema.js";
 let options: ConstructorParameters<typeof Miniflare>[0];
 let mf: Miniflare, apiKey = "", extractionCalls = 0, organizationCalls = 0, failNext = false, recordedContent = "";
 let blocked: (() => void) | undefined, signalStarted: (() => void) | undefined;
 let failOrganizationNext = false;
 const extraction = { entities: [{ type: "task", content: "Ship the Cloudflare migration", status: "captured", confidence: 0.5,
   fieldConfidence: {}, attributes: {}, tags: ["hosting"], evidence: [{ quote: "Ship the Cloudflare migration" }] }], relationships: [] };
-const organization = { entityOrganizations: [], epicSuggestions: [], projectSuggestions: [{
+let organizationOverride: OrganizationResult | undefined;
+const organization: OrganizationResult = { entityOrganizations: [], epicSuggestions: [], projectSuggestions: [{
   name: "Cloudflare migration", description: "A free hobby workspace", entityIndices: [0], confidence: 0.9, reason: "Explicit project" }] };
 async function request(path: string, json?: unknown, key = apiKey, method = json === undefined ? "GET" : "POST") {
   return mf.dispatchFetch("https://clarify.test" + path, { method, headers: {
@@ -50,7 +52,7 @@ beforeAll(async () => {
         }
       } else organizationCalls++;
       return WorkerResponse.json({ id: "msg_test", type: "message", role: "assistant", model: "claude-sonnet-4-6",
-        content: [{ type: "tool_use", id: "tool_test", name, input: name === "extract_entities" ? extraction : organization }],
+        content: [{ type: "tool_use", id: "tool_test", name, input: name === "extract_entities" ? extraction : (organizationOverride ?? organization) }],
         stop_reason: "tool_use", usage: { input_tokens: 10, output_tokens: 10 } });
     },
   };
@@ -81,6 +83,33 @@ describe("actual Cloudflare runtime", () => {
     const cors = await mf.dispatchFetch("https://clarify.test/api/projects", { method: "OPTIONS", headers: {
       origin: "https://clarify.test", "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type" } });
     expect(cors.headers.get("access-control-allow-origin")).toBe("https://clarify.test");
+  });
+  it("finishes new-project organization despite nonexistent epic parents and preserves valid suggestions", async () => {
+    expect(await sql("SELECT id FROM projects WHERE status = 'active'")).toHaveLength(0);
+    try {
+      for (const validProject of [false, true]) for (const confidence of [0.9, 0.5]) {
+        const projectId = validProject
+          ? String((await sql("SELECT id FROM projects ORDER BY created_at LIMIT 1"))[0].id)
+          : "00000000-0000-0000-0000-000000000000";
+        const name = `Epic parent verification ${validProject} ${confidence}`;
+        organizationOverride = { entityOrganizations: validProject ? [{
+          entityIndex: 0, projectId, projectConfidence: 0.9, projectReason: "Existing project",
+          epicId: null, epicConfidence: 0, epicReason: "See epic suggestion", duplicateCandidates: [],
+          assigneeId: null, assigneeConfidence: 0, assigneeReason: null,
+        }] : [], projectSuggestions: validProject ? [] : [{ ...organization.projectSuggestions[0], name }], epicSuggestions: [{
+          projectId, name, description: null, entityIndices: [0], confidence, reason: "Related work",
+        }] };
+        const { note } = await (await request("/api/notes/capture", { content: name, source: "cli" })).json() as any;
+        await completed(note.id);
+        expect((await sql("SELECT processing_error FROM raw_notes WHERE id = ?", note.id))[0].processing_error).toBeNull();
+        const assigned = await sql("SELECT e.project_id FROM entities e JOIN entity_sources s ON s.entity_id = e.id WHERE s.raw_note_id = ?", note.id);
+        expect(assigned).toHaveLength(1);
+        expect(assigned[0].project_id).toBeTruthy();
+        expect(await sql("SELECT id FROM epics WHERE name = ?", name)).toHaveLength(validProject && confidence >= 0.7 ? 1 : 0);
+        expect(await sql("SELECT id FROM review_queue WHERE review_type = 'epic_creation' AND json_extract(ai_suggestion, '$.proposedEpicName') = ?", name))
+          .toHaveLength(validProject && confidence < 0.7 ? 1 : 0);
+      }
+    } finally { organizationOverride = undefined; }
   });
   it("captures, extracts, organizes, reviews and reprocesses without duplicate delivery", async () => {
     const before = extractionCalls;

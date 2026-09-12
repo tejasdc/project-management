@@ -188,6 +188,8 @@ The entityIndices array in your project suggestion is the sole linkage between e
 
 The same rule applies for epic suggestions: if an entity belongs to a suggested new epic, set epicId: null and epicConfidence: 0 in its entityOrganizations entry, and reference it via entityIndices in the epic suggestion.
 
+Every epic suggestion must use a projectId from the supplied active projects list. A project proposed in this response has no ID yet: do not suggest epics for it or invent placeholder UUIDs. When there are no active projects, return an empty epicSuggestions array.
+
 ## Confidence
 
 Provide confidence scores (0.0-1.0) for project, epic, duplicates, and assignee. Items with confidence >= 0.7 will be auto-applied. Items below 0.7 will be routed to a human review queue. Calibrate your scores accordingly — 0.7+ means you are confident in the assignment.

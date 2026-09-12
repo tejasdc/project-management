@@ -278,6 +278,7 @@ export async function entitiesOrganizeProcessor(job: Job<EntitiesOrganizeJob>) {
 
       // Epic creation suggestions — auto-create if confident, otherwise review.
       for (const s of org.result.epicSuggestions) {
+        if (!projectIds.includes(s.projectId)) continue;
         const candidateEntityIds = (s.entityIndices ?? [])
           .map((idx) => entityIds[idx])
           .filter(Boolean);
