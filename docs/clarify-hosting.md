@@ -69,8 +69,27 @@ Credential-free public probes passed valid TLS, HTTP-to-HTTPS redirects on every
 hostname, www canonical redirects preserving paths and queries, SPA deep links,
 database health and anonymous API rejection. GitHub CI passed the release commit;
 local gates passed 89 API tests, 12 native tests, typechecks and the web build.
-Old DNS answers may still reach the free Render static fallback for up to four hours.
-That fallback already calls the Cloudflare API and has auto-deploy disabled.
+Cloudflare is the only deployment and recovery target. The September 13 owner
+instruction requires deletion of all Clarify.pm Render resources and supersedes
+the earlier temporary fallback arrangement.
+
+On September 13, 2026, Render returned HTTP 204 for deletion and then HTTP 404 for
+each of these exact project resources:
+- Blueprint exs-d63thkkr85hc73bfn9i0.
+- Static frontend pm-web, srv-d63tlvhr0fns73bsb560.
+- API pm-api, srv-d63tmipr0fns73bsbcu0.
+- Background worker pm-worker, srv-d64ftfogjchc739nejpg.
+- Redis pm-redis, red-d64fsbf5r7bs73af5u4g.
+
+The old Postgres resource dpg-d63tlvpr0fns73bsb5ag-a was already absent. There are
+no suspended Clarify.pm services to maintain or resume. The complete owner-filtered
+inventory identified other projects separately; only these Clarify.pm resources
+were deleted. The Cloudflare runtime and its database were not changed by removal.
+After deletion, complete service, Blueprint, Redis and Postgres lists confirmed no
+Clarify.pm resources remained. A live Chromium check at 1440×1000 passed homepage,
+login, same-origin API calls, live updates through both API domains, preserved raw
+notes and AI/review results, and logout. Anonymous API requests still returned 401;
+HTTPS and www redirects passed. Verification-account keys were revoked afterward.
 
 Final same-origin browser acceptance passed Chromium and WebKit on Linux at
 1440×1000 and 390×844: sign-in, live updates from both API hostnames, raw-note
@@ -94,19 +113,10 @@ and web, pass the API/native/browser checks, then run scripts/deploy-cloudflare.
 Worker secrets are ANTHROPIC_API_KEY and REGISTRATION_CODE; never commit them or use
 Wrangler OAuth. All runtime data belongs to this Worker's own Workspace namespace.
 
-Render control remains available with ~/.config/render/clarify.env (personal workspace,
-separate from IdeaFlow). The migration disabled and verified:
-- Blueprint exs-d63thkkr85hc73bfn9i0 autoSync=false.
-- API srv-d63tmipr0fns73bsbcu0 autoDeploy=no and suspended after canonical acceptance.
-- Worker srv-d64ftfogjchc739nejpg autoDeploy=no; it remains suspended.
-- Redis red-d64fsbf5r7bs73af5u4g status=suspended; the old Postgres resource remains absent.
-
-Existing static frontend srv-d63tlvhr0fns73bsb560 retains its clarify.pm/www domains
-and /* → /index.html rewrite solely for cached DNS and rollback. Its deployed
-VITE_API_URL points to the Cloudflare provider URL and autoDeploy=no. Normal releases
-use only scripts/deploy-cloudflare.sh; do not redeploy the Render fallback.
-render.yaml describes only that free static service. Do not manually sync the old
-Blueprint, resume the old paid worker/Redis, or recreate the absent database.
+Use only scripts/deploy-cloudflare.sh. The old Render deployment file and Postgres
+reset tooling have been removed. Production diagnostics use production-debug and
+the current Cloudflare runtime. Historical designs do not authorize recreating any
+Render resource.
 
 ## Data, recovery and acceptance
 
@@ -130,12 +140,7 @@ Browser acceptance covers both desktop and phone in Chromium/WebKit on Linux.
 Live acceptance must exercise real Sonnet extraction and organization, review and
 reload persistence from the published app. Only then remove the homepage offline notice.
 
-For the final DNS move, verify the copied Cloudflare records against a fresh Hostinger
-export, change registrar nameservers to the assigned Cloudflare pair,
-verify always_use_https=on, then bind clarify.pm, www and api.clarify.pm to this Worker.
-Verify credential-free HTTP redirects on every hostname, TLS, SPA deep links,
-authenticated API requests and browser live updates before retiring the static service.
-The Worker configuration owns these domains and preserves www page redirects, paths
-and queries. Disable Render frontend auto-deploy after acceptance, retaining its free
-static fallback while prior DNS answers may be cached (original record TTL up to four
-hours, parent NS TTL one hour). Do not delete it during that cache window.
+The Worker configuration owns clarify.pm, www.clarify.pm and api.clarify.pm and
+preserves www page redirects, paths and queries. Verify HTTPS, authenticated API
+requests, source persistence and live browser behavior after infrastructure changes.
+Do not add a second hosting provider for fallback or rollback.

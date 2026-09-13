@@ -62,20 +62,19 @@ are clarify.pm, www.clarify.pm and api.clarify.pm, sharing the same Workspace ob
 www page/API requests redirect to clarify.pm with their path and query preserved.
 Page requests pass through the Worker for canonical redirects; /assets/* and
 /homepage/* bypass execution. The browser uses same-origin /api requests.
-See docs/clarify-hosting.md for DNS cutover state, acceptance and rollback.
+See docs/clarify-hosting.md for deployment, acceptance and Cloudflare recovery.
 Verify Cloudflare always_use_https=on before activating custom domains; domain
 ownership and DNS permissions do not include Zone Settings access. Preserve HTTPS
 enforcement and probe HTTP redirects without credentials before live sign-in.
 
 Use only ~/.config/cloudflare/deploy.env for deployment credentials.
-Render personal credentials: ~/.config/render/clarify.env. Existing static service:
-srv-d63tlvhr0fns73bsb560. Blueprint exs-d63thkkr85hc73bfn9i0 auto-sync and old API/worker
-auto-deploys were disabled and verified before changing deployment configuration.
-Never resume paid resources or restore the old Blueprint. Render is only a rollback
-and DNS-cache fallback during domain cutover; its frontend must not auto-deploy after
-Cloudflare acceptance. Retain that free fallback while old DNS answers can be cached.
-Canonical domain acceptance passed September 12, 2026; the old API, worker and Redis
-are suspended, and the Render frontend has autoDeploy=no.
+Cloudflare is the only deployment target. The owner explicitly required complete
+Render removal on September 13, 2026 (message 1789325243.820769), superseding all
+fallback-retention instructions. Do not retain or recreate a Render service,
+Blueprint, deployment file or recovery path for this project. Recovery uses a
+compatible Cloudflare Worker version and the existing Workspace database.
+All five former Render resources were deleted and verified absent on September 13;
+post-deletion browser, API, persistence and live-update checks passed.
 
 Publish packages/web/dist only. Homepage: packages/web/src/components/Homepage.tsx,
 assets: packages/web/public/homepage/. The example is illustrative, never an API call.
@@ -106,8 +105,8 @@ with this runtime. Spec-check requires an independent advisory check of product 
 Consequential architecture and integrated high-risk release reviews follow global
 risk-based review rules. Delegate production log investigations to a bounded agent;
 direct release probes and live acceptance remain the delivering agent's work.
-The legacy render-debug command now routes diagnostics to the current Cloudflare
-runtime; its provider and credential authority is docs/clarify-hosting.md.
+Use production-debug for bounded diagnostics of the current Cloudflare runtime;
+its provider and credential authority is docs/clarify-hosting.md.
 
 ## Safety and library rules
 

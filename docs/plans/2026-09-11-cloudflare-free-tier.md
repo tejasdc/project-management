@@ -5,8 +5,9 @@
 Published and verified, September 11, 2026 (September 12 UTC). The Cloudflare backend
 and canonical clarify.pm app passed real AI capture, organization, review and live
 browser acceptance. On September 12, registrar delegation and all three custom
-domains moved to the existing Cloudflare Worker. The old free Render frontend remains
-only for cached DNS and rollback; its automatic deploys are disabled.
+domains moved to the existing Cloudflare Worker. On September 13, the owner required
+complete Render removal with no fallback. This document preserves the original
+design and pre-migration inventory; it is not a deployment or recovery runbook.
 Current operational authority is [the hosting runbook](../clarify-hosting.md).
 Tejas's later request authorizes migration to Cloudflare free-tier
 infrastructure and supersedes the earlier request to keep Render. Preserve the

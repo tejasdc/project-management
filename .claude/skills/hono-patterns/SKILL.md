@@ -10,7 +10,7 @@ Errors use lib/errors.ts. Request logs include paths and operational metadata on
 
 The API runs inside the Workspace Durable Object. Use the runtime database accessor;
 there is no Node HTTP server or Postgres pool. CORS must permit the canonical frontend
-and Worker origins, including the temporary cross-origin Render frontend arrangement.
+and Worker origins. The production browser uses same-origin Cloudflare API requests.
 
 Public paths: /api/health, /api/auth/register, /api/auth/login. Registration still
 requires the workspace invitation secret. API keys authenticate every other route.

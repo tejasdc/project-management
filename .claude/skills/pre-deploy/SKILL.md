@@ -14,9 +14,8 @@ new permission gate.
 Check wrangler.jsonc provisions this project's own SQLite Workspace namespace and
 keeps /assets/* and /homepage/* outside Worker execution. Page requests enter the
 Worker to preserve www canonical redirects; /api/* reaches the existing Workspace.
-render.yaml retains only the free DNS-cache fallback with auto-deploy disabled after
-cutover. Never recreate pm-db or resume paid Redis/worker
-resources. Blueprint auto-sync and old API/worker auto-deploy are disabled.
+Cloudflare is the only deployment target. Verify that no Render deployment file,
+service, Blueprint or fallback is introduced. Redis and separate workers are retired.
 Before custom-domain attachment, verify always_use_https=on. Probe HTTP redirects
 without credentials on apex, www and API hosts before live authentication.
 
